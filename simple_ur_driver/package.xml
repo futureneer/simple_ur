@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package>
+  <name>simple_ur_driver</name>
+  <version>0.0.0</version>
+  <description>The simple_ur_driver package</description>
+
+  <maintainer email="kguerin2@jhu.edu">Kel Guerin</maintainer>
+  <license>BSD</license>
+  <author email="kguerin2@jhu.edu">Kel Guerin</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>message_generation</build_depend>
+  <build_depend>rospy</build_depend>
+  <run_depend>rospy</run_depend>
+
+  <export>
+    <!-- You can specify that this package is a metapackage here: -->
+  </export>
+</package>
