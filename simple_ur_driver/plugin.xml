@@ -1,0 +1,31 @@
+<library path="src">
+  <class name="URStatusPanel" type="simple_ur_driver.ur_status_interface_rqt.URStatusPanel" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      A GUI for status and control of the UR5 robot
+    </description>
+    <qtgui>
+      <group>
+        <label>UR5</label>
+      </group>
+      <label>UR5 Status Pannel</label>
+      <icon type="theme">system-help</icon>
+      <statustip>A GUI for status and control of the UR5 robot.</statustip>
+    </qtgui>
+  </class>
+
+  <class name="URMarkerTeleopPanel" type="simple_ur_driver.marker_teleop_interface_rqt.URMarkerTeleopPanel" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      A GUI for commanding the UR5 to a published marker position.
+    </description>
+    <qtgui>
+      <group>
+        <label>UR5</label>
+      </group>
+      <label>UR5 Marker Teleop</label>
+      <icon type="theme">system-help</icon>
+      <statustip>A GUI for commanding the UR5 to a published marker position.</statustip>
+    </qtgui>
+  </class>
+  
+</library>
+

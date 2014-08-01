@@ -15,6 +15,7 @@
   <run_depend>rospy</run_depend>
 
   <export>
+    <rqt_gui plugin="${prefix}/plugin.xml"/>
     <!-- You can specify that this package is a metapackage here: -->
   </export>
 </package>

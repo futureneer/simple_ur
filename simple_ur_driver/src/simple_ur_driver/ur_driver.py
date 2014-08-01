@@ -15,7 +15,8 @@ import urx
 import logging
 
 class URDriver():
-
+    MAX_ACC = 1.0
+    MAX_VEL = 1.0
     JOINT_NAMES = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
                'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
     
@@ -31,7 +32,7 @@ class URDriver():
         self.set_teach_mode_service = rospy.Service('simple_ur_msgs/SetTeachMode', SetTeachMode, self.set_teach_mode_call)
         self.set_servo_mode_service = rospy.Service('simple_ur_msgs/SetServoMode', SetServoMode, self.set_servo_mode_call)
         # PUBLISHERS AND SUBSCRIBERS
-        self.state_publisher = rospy.Publisher('ur_robot/state',String)
+        self.status_pubblisher = rospy.Publisher('/ur_robot/state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
 
         ### Set Up Robot ###
@@ -84,7 +85,6 @@ class URDriver():
 
     def check_state(self):
         if self.state == 'DISCONNECTED':
-            # TODO check for connection
             pass
         elif self.state == 'IDLE': 
             pass
@@ -95,6 +95,7 @@ class URDriver():
 
     def set_teach_mode_call(self,req):
         if self.state == 'SERVO':
+            rospy.logwarn('SIMPLE UR -- cannot enter teach mode, servo mode is active')
             return 'FAILED - servo mode is active'
         else:
             if req.enable == True:
@@ -108,6 +109,7 @@ class URDriver():
 
     def set_servo_mode_call(self,req):
         if self.state == 'TEACH':
+            rospy.logwarn('SIMPLE UR -- cannot enter servo mode, teach mode is active')
             return 'FAILED - teach mode is active'
         else:
             if req.enable == True:
@@ -122,28 +124,19 @@ class URDriver():
         self.rob.stop()
         return 'SUCCESS - stopped robot'
 
-    def servo_to_pose_call(self,req):
-        pass
+    def servo_to_pose_call(self,req): 
+        if self.state == 'SERVO':
+            T = tf_c.fromMsg(req.target)
+            a,axis = T.M.GetRotAngle()
+            pose = list(T.p) + [a*axis[0],a*axis[1],a*axis[2]]
+            self.rob.movel(pose,acc=self.MAX_ACC,vel=self.MAX_VEL)
+            return 'SUCCESS - moved to pose'
+        else:
+            rospy.logerr('SIMPLE UR -- Not in servo mode')
+            return 'FAILED - not in servo mode'
 
-
+    def publish_status(self):
+        self.status_pub.publish(String(self.state))
 
 if __name__ == "__main__":
     robot_driver = URDriver()
-
-    # try:
-    #     l = 0.05
-    #     v = 0.05
-    #     a = 0.3
-    #     pose = rob.getl()
-    #     print("robot tcp is at: ", pose)
-    #     print("absolute move in base coordinate ")
-    #     pose[2] += l
-    #     rob.movel(pose, acc=a, vel=v)
-    #     print("relative move in base coordinate ")
-    #     rob.translate((0, 0, -l), acc=a, vel=v)
-    #     print("relative move back and forth in tool coordinate")
-    #     rob.translate_tool((0, 0, -l), acc=a, vel=v)
-    #     rob.translate_tool((0, 0, l), acc=a, vel=v)
-    # finally:
-    #     rob.cleanup()
-
