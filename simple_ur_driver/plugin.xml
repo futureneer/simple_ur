@@ -5,9 +5,9 @@
     </description>
     <qtgui>
       <group>
-        <label>UR5</label>
+        <label>Universal Robot</label>
       </group>
-      <label>UR5 Status Pannel</label>
+      <label>Simple UR Status Pannel</label>
       <icon type="theme">system-help</icon>
       <statustip>A GUI for status and control of the UR5 robot.</statustip>
     </qtgui>
@@ -19,9 +19,9 @@
     </description>
     <qtgui>
       <group>
-        <label>UR5</label>
+        <label>Universal Robot</label>
       </group>
-      <label>UR5 Marker Teleop</label>
+      <label>Simple UR Marker Teleop</label>
       <icon type="theme">system-help</icon>
       <statustip>A GUI for commanding the UR5 to a published marker position.</statustip>
     </qtgui>
