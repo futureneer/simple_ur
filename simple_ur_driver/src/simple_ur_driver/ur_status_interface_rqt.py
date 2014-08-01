@@ -13,7 +13,7 @@ from control_msgs.msg import *
 from trajectory_msgs.msg import *
 from geometry_msgs.msg import *
 import PyKDL
-from simple_ur_driver.srv import *
+from simple_ur_msgs.srv import *
 import tf; from tf import *
 import tf_conversions as tf_c
 import rospkg
@@ -98,13 +98,13 @@ class URStatusPanel(Plugin):
         if self.freedrive == False:
             if self.servo == False:
                 try:
-                    rospy.wait_for_service('/simple_ur_driver/SetServoMode',2)
+                    rospy.wait_for_service('/simple_ur_msgs/SetServoMode',2)
                 except rospy.ROSException as e:
                     print 'Could not find SetServoMode service'
                     self._widget.msg_label.setText("NO SERVO_ENABLE SERVICE")
                     return
                 try:
-                    servo_mode_service = rospy.ServiceProxy('/simple_ur_driver/SetServoMode',SetServoMode)
+                    servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
                     result = servo_mode_service(True)
                     self.servo = True
                     self._widget.servo_enable_label.setText('ENABLED')
@@ -122,13 +122,13 @@ class URStatusPanel(Plugin):
         if self.freedrive == False:
             if self.servo == True:
                     try:
-                        rospy.wait_for_service('/simple_ur_driver/SetServoMode',2)
+                        rospy.wait_for_service('/simple_ur_msgs/SetServoMode',2)
                     except rospy.ROSException as e:
                         print 'Could not find SetServoMode service'
                         self._widget.msg_label.setText("NO SERVO_ENABLE SERVICE")
                         return
                     try:
-                        servo_mode_service = rospy.ServiceProxy('/simple_ur_driver/SetServoMode',SetServoMode)
+                        servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
                         result = servo_mode_service(False)
                         self.servo = False
                         self._widget.servo_enable_label.setText('DISABLED')
@@ -146,12 +146,12 @@ class URStatusPanel(Plugin):
         if self.servo == False:
             if self.freedrive == False:
                 try:
-                    rospy.wait_for_service('/simple_ur_driver/SetTeachMode',2)
+                    rospy.wait_for_service('/simple_ur_msgs/SetTeachMode',2)
                 except rospy.ROSException as e:
                     print 'Could not find freedrive service'
                     return
                 try:
-                    teach_mode_service = rospy.ServiceProxy('/simple_ur_driver/SetTeachMode',SetTeachMode)
+                    teach_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetTeachMode',SetTeachMode)
                     result = teach_mode_service(True)
                     # print 'Service returned: ' + str(result.ack)
                     self.freedrive = True
@@ -168,12 +168,12 @@ class URStatusPanel(Plugin):
     def freedrive_disable(self):
         if self.freedrive == True:
             try:
-                rospy.wait_for_service('/simple_ur_driver/SetTeachMode',2)
+                rospy.wait_for_service('/simple_ur_msgs/SetTeachMode',2)
             except rospy.ROSException as e:
                 print 'Could not find freedrive service'
                 return
             try:
-                teach_mode_service = rospy.ServiceProxy('/simple_ur_driver/SetTeachMode',SetTeachMode)
+                teach_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetTeachMode',SetTeachMode)
                 result = teach_mode_service(False)
                 # print 'Service returned: ' + str(result.ack)
                 self.freedrive = False
@@ -204,9 +204,9 @@ class URStatusPanel(Plugin):
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')
 
     # def stop_robot(self):
-    #     rospy.wait_for_service('/simple_ur_driver/stop')
+    #     rospy.wait_for_service('/simple_ur_msgs/stop')
     #     try:
-    #         stop_service = rospy.ServiceProxy('/simple_ur_driver/stop',stop)
+    #         stop_service = rospy.ServiceProxy('/simple_ur_msgs/stop',stop)
     #         result = stop_service('')
     #         return result
     #     except rospy.ServiceException, e:

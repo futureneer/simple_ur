@@ -13,8 +13,7 @@ from control_msgs.msg import *
 from trajectory_msgs.msg import *
 from geometry_msgs.msg import *
 import PyKDL
-import simple_ur_driver
-from simple_ur_driver.srv import *
+from simple_ur_msgs.srv import *
 import tf; from tf import *
 import tf_conversions as tf_c
 import rospkg
@@ -45,9 +44,9 @@ class URMarkerTeleopPanel(Plugin):
 
         self._widget.servo_to_btn.clicked.connect(self.servo_to_pose)
 
-        while self.status == 'DISCONNECTED':
-            rospy.logwarn('WARNING <<< DID NOT HEAR FROM ROBOT')
-            rospy.sleep(1)
+        # if self.status == 'DISCONNECTED':
+        #     rospy.logwarn('WARNING <<< DID NOT HEAR FROM ROBOT')
+        #     rospy.sleep(1)
         
         rospy.logwarn('MARKER TELEOP INTERFACE READY')
 
@@ -60,16 +59,16 @@ class URMarkerTeleopPanel(Plugin):
             rospy.logwarn('ROBOT NOT IN SERVO MODE')
             return
         else:
-            rospy.wait_for_service('/simple_ur_driver/Servo')
+            rospy.wait_for_service('/simple_ur_msgs/Servo')
             try:
-                pose_servo_proxy = rospy.ServiceProxy('/simple_ur_driver/ServoToPose',ServoToPose)
+                pose_servo_proxy = rospy.ServiceProxy('/simple_ur_msgs/ServoToPose',ServoToPose)
                 
                 F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
                 F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
                 F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
                 F_command = F_base_world.Inverse()*F_target_world
                     
-                msg = simple_ur_driver.srv.ServoToPoseRequest()
+                msg = simple_ur_msgs.srv.ServoToPoseRequest()
                 msg.target = tf_c.toMsg(F_command)
                 msg.accel = .7
                 msg.vel = .3
@@ -83,7 +82,6 @@ class URMarkerTeleopPanel(Plugin):
 
     def shutdown_plugin(self):
         # unregister all publishers here
-        self.update_timer_.stop()
 
     def save_settings(self, plugin_settings, instance_settings):
         # TODO save intrinsic configuration, usually using:
