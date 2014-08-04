@@ -81,6 +81,7 @@ class URMarkerTeleopPanel(Plugin):
                 print e
 
     def shutdown_plugin(self):
+        pass
         # unregister all publishers here
 
     def save_settings(self, plugin_settings, instance_settings):

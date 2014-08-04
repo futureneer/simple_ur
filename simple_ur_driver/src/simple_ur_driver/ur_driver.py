@@ -32,23 +32,27 @@ class URDriver():
         self.set_teach_mode_service = rospy.Service('simple_ur_msgs/SetTeachMode', SetTeachMode, self.set_teach_mode_call)
         self.set_servo_mode_service = rospy.Service('simple_ur_msgs/SetServoMode', SetServoMode, self.set_servo_mode_call)
         # PUBLISHERS AND SUBSCRIBERS
-        self.status_pubblisher = rospy.Publisher('/ur_robot/state',String)
+        self.driver_status_publisher = rospy.Publisher('/ur_robot/driver_status',String)
+        self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)        
         if not self.rob:
             rospy.logwarn('SIMPLE UR  - ROBOT NOT CONNECTED')
-            self.state = 'DISCONNECTED'
+            self.driver_status = 'DISCONNECTED'
+            self.robot_state = 'POWER OFF'
         else:
             rospy.logwarn('SIMPLE UR - ROBOT CONNECTED SUCCESSFULLY')
-            self.state = 'IDLE'
+            self.driver_status = 'IDLE'
             self.rob.set_tcp((0,0,0,0,0,0))
             self.rob.set_payload(1.5, (0,0,0))
 
         while not rospy.is_shutdown():
             self.update()
-            self.check_state()
+            self.check_driver_status()
+            self.check_robot_state()
+            self.publish_status()
             rospy.sleep(.01)
 
         # Finish
@@ -56,7 +60,7 @@ class URDriver():
         self.rob.shutdown()
 
     def update(self):
-        if not self.state == 'DISCONNECTED':
+        if not self.driver_status == 'DISCONNECTED':
             # Get Joint Positions
             self.current_joint_positions = self.rob.getj()
             msg = JointState()
@@ -83,40 +87,40 @@ class URDriver():
             self.current_tcp_frame = T
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
-    def check_state(self):
-        if self.state == 'DISCONNECTED':
+    def check_driver_status(self):
+        if self.driver_status == 'DISCONNECTED':
             pass
-        elif self.state == 'IDLE': 
+        elif self.driver_status == 'IDLE': 
             pass
-        elif self.state == 'SERVO': 
+        elif self.driver_status == 'SERVO': 
             pass
-        elif self.state == 'TEACH': 
+        elif self.driver_status == 'TEACH': 
             pass
 
     def set_teach_mode_call(self,req):
-        if self.state == 'SERVO':
+        if self.driver_status == 'SERVO':
             rospy.logwarn('SIMPLE UR -- cannot enter teach mode, servo mode is active')
             return 'FAILED - servo mode is active'
         else:
             if req.enable == True:
                 self.rob.set_freedrive(True)
-                self.state = 'TEACH'
+                self.driver_status = 'TEACH'
                 return 'SUCCESS - teach mode enabled'
             else:
                 self.rob.set_freedrive(False)
-                self.state = 'IDLE'
+                self.driver_status = 'IDLE'
                 return 'SUCCESS - teach mode disabled'
 
     def set_servo_mode_call(self,req):
-        if self.state == 'TEACH':
+        if self.driver_status == 'TEACH':
             rospy.logwarn('SIMPLE UR -- cannot enter servo mode, teach mode is active')
             return 'FAILED - teach mode is active'
         else:
             if req.enable == True:
-                self.state = 'SERVO'
+                self.driver_status = 'SERVO'
                 return 'SUCCESS - servo mode enabled'
             else:
-                self.state = 'IDLE'
+                self.driver_status = 'IDLE'
                 return 'SUCCESS - teach mode disabled'
 
     def set_stop_call(self,req):
@@ -125,7 +129,7 @@ class URDriver():
         return 'SUCCESS - stopped robot'
 
     def servo_to_pose_call(self,req): 
-        if self.state == 'SERVO':
+        if self.driver_status == 'SERVO':
             T = tf_c.fromMsg(req.target)
             a,axis = T.M.GetRotAngle()
             pose = list(T.p) + [a*axis[0],a*axis[1],a*axis[2]]
@@ -136,7 +140,28 @@ class URDriver():
             return 'FAILED - not in servo mode'
 
     def publish_status(self):
-        self.status_pub.publish(String(self.state))
+        self.driver_status_publisher.publish(String(self.driver_status))
+        self.robot_state_publisher.publish(String(self.robot_state))
+
+    def check_robot_state(self):
+        mode = self.rob.get_all_data()['RobotModeData']
+
+        if not mode['isPowerOnRobot']:
+            self.robot_state = 'POWER OFF'
+            return
+
+        if mode['isEmergencyStopped']:
+            self.robot_state = 'E-STOPPED'
+        elif mode['isSecurityStopped']:
+            self.robot_state = 'SECURITY STOP'
+        elif mode['isProgramRunning']:
+            self.robot_state ='RUNNING PROGRAM'
+        else:
+            self.robot_state = 'RUNNING IDLE'
+
+
+
+
 
 if __name__ == "__main__":
     robot_driver = URDriver()

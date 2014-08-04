@@ -39,10 +39,10 @@ class URStatusPanel(Plugin):
         # # Parameters
         self.freedrive = False
         self.servo = False
-        self.status = 'DISCONNECTED'
         self.listener_ = TransformListener()
 
-        self.status_sub = rospy.Subscriber('/ur_robot/state',String,self.status_cb)
+        self.driver_status_sub = rospy.Subscriber('/ur_robot/driver_status',String,self.driver_status_cb)
+        self.robot_state_sub = rospy.Subscriber('/ur_robot/robot_state',String,self.robot_state_cb)
 
         self._widget.freedrive_enable_btn.clicked.connect(self.freedrive_enable)
         self._widget.freedrive_disable_btn.clicked.connect(self.freedrive_disable)
@@ -51,6 +51,14 @@ class URStatusPanel(Plugin):
 
         self._widget.gripper_open_btn.clicked.connect(self.gripper_open)
         self._widget.gripper_close_btn.clicked.connect(self.gripper_close)
+
+        self.driver_status = 'DISCONNECTED'
+        self.robot_state = 'DISCONNECTED'
+
+        self.status_timer = QTimer(self)
+        self.connect(self.status_timer, QtCore.SIGNAL("timeout()"), self.check_status)
+        self.status_timer.start(100)
+        self.update_timeout = 0
 
     def gripper_open(self):
         try:
@@ -90,11 +98,15 @@ class URStatusPanel(Plugin):
         except rospy.ServiceException, e:
             print e
 
-    def status_cb(self,msg):
-        self.status = msg.data
+    def driver_status_cb(self,msg):
+        self.driver_status = msg.data
+        self.update_timeout = 0
+
+    def robot_state_cb(self,msg):
+        self.robot_state = msg.data
 
     def servo_enable(self):
-        rospy.logwarn('enabling servo')
+        # rospy.logwarn('trying to enabling servo')
         if self.freedrive == False:
             if self.servo == False:
                 try:
@@ -106,6 +118,7 @@ class URStatusPanel(Plugin):
                 try:
                     servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
                     result = servo_mode_service(True)
+                    rospy.logwarn(result.ack)
                     self.servo = True
                     self._widget.servo_enable_label.setText('ENABLED')
                     self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#ADE817')
@@ -118,7 +131,6 @@ class URStatusPanel(Plugin):
             self._widget.msg_label.setText("CANT SERVO, FREEDRIVE ENABLED")
 
     def servo_disable(self):
-        rospy.logwarn('disabling servo')
         if self.freedrive == False:
             if self.servo == True:
                     try:
@@ -130,6 +142,7 @@ class URStatusPanel(Plugin):
                     try:
                         servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
                         result = servo_mode_service(False)
+                        rospy.logwarn(result.ack)
                         self.servo = False
                         self._widget.servo_enable_label.setText('DISABLED')
                         self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
@@ -142,7 +155,7 @@ class URStatusPanel(Plugin):
             self._widget.msg_label.setText("CANT DISABLE SERVO, FREEDRIVE ENABLED")
 
     def freedrive_enable(self):
-        rospy.logwarn('enabling freedrive')
+        # rospy.logwarn('trying to enabling freedrive')
         if self.servo == False:
             if self.freedrive == False:
                 try:
@@ -153,7 +166,7 @@ class URStatusPanel(Plugin):
                 try:
                     teach_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetTeachMode',SetTeachMode)
                     result = teach_mode_service(True)
-                    # print 'Service returned: ' + str(result.ack)
+                    rospy.logwarn(result.ack)
                     self.freedrive = True
                     self._widget.freedrive_enable_label.setText('ENABLED')
                     self._widget.freedrive_enable_label.setStyleSheet('color:#ffffff;background-color:#ADE817')
@@ -175,7 +188,7 @@ class URStatusPanel(Plugin):
             try:
                 teach_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetTeachMode',SetTeachMode)
                 result = teach_mode_service(False)
-                # print 'Service returned: ' + str(result.ack)
+                rospy.logwarn(result.ack)
                 self.freedrive = False
                 self._widget.freedrive_enable_label.setText('DISABLED')
                 self._widget.freedrive_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
@@ -186,22 +199,45 @@ class URStatusPanel(Plugin):
             print 'Freedrive is not enabled'
 
     def check_status(self):
-        if self.status == 'IDLE':
-            self._widget.mode_label.setText(str(self.status))
+        if self.driver_status == 'IDLE':
+            self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EBCF1A')
-        elif self.status == 'SERVO':
-            self._widget.mode_label.setText(str(self.status))
+        elif self.driver_status == 'SERVO':
+            self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#AFEB1A')
-        elif self.status == 'TEACH':
-            self._widget.mode_label.setText(str(self.status))
+        elif self.driver_status == 'TEACH':
+            self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#1AA5EB')
-        elif self.status == 'DISCONNECTED':
+        elif self.driver_status == 'DISCONNECTED':
             self.servo = False
             self._widget.servo_enable_label.setText('DISABLED')
             self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
             self._widget.msg_label.setText("SERVO DISABLED")
-            self._widget.mode_label.setText(str(self.status))
+            self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')
+
+        if self.robot_state == 'POWER OFF':
+            self._widget.status_label.setText(self.robot_state)
+            self._widget.status_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
+        elif self.robot_state == 'E-STOPPED':
+            self._widget.status_label.setText(self.robot_state)
+            self._widget.status_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
+        elif self.robot_state == 'SECURITY STOP':
+            self._widget.status_label.setText(self.robot_state)
+            self._widget.status_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
+        elif self.robot_state == 'RUNNING PROGRAM':
+            self._widget.status_label.setText(self.robot_state)
+            self._widget.status_label.setStyleSheet('color:#ffffff;background-color:#AFEB1A')
+        elif self.robot_state == 'RUNNING IDLE':
+            self._widget.status_label.setText(self.robot_state)
+            self._widget.status_label.setStyleSheet('color:#ffffff;background-color:#BFC983')
+
+        self.update_timeout += 1
+        if self.update_timeout == 20:
+            rospy.logerr('STATUS PANEL HAS NOT HEARD FROM DRIVER... DISCONNECTED')
+            self._widget.mode_label.setText('DISCONNECTED')
+            self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')
+
 
     # def stop_robot(self):
     #     rospy.wait_for_service('/simple_ur_msgs/stop')
