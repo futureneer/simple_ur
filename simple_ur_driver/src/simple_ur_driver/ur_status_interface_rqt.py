@@ -64,7 +64,7 @@ class URStatusPanel(Plugin):
         try:
             rospy.wait_for_service('/robotiq_c_model_control/Open',2)
         except rospy.ROSException as e:
-            print 'Could not find gripper Open service'
+            rospy.logwarn('Could not find gripper Open service')
             self._widget.msg_label.setText("NO GRIPPER OPEN SERVICE")
             return
         try:
@@ -73,17 +73,18 @@ class URStatusPanel(Plugin):
             msg.state = True
             msg.wait = True
             result = gripper_open_proxy(msg)
+            rospy.logwarn(result.ack)
             self._widget.gripper_state_label.setText('OPEN')
             self._widget.gripper_state_label.setStyleSheet('color:#ffffff;background-color:#3FC4FC')
             self._widget.msg_label.setText("GRIPPER OPENED")
         except rospy.ServiceException, e:
-            print e
+            rospy.logwarn(e)
 
     def gripper_close(self):
         try:
             rospy.wait_for_service('/robotiq_c_model_control/Open',2)
         except rospy.ROSException as e:
-            print 'Could not find gripper Open service'
+            rospy.logwarn('Could not find gripper Open service')
             self._widget.msg_label.setText("NO GRIPPER OPEN SERVICE")
             return
         try:
@@ -92,11 +93,12 @@ class URStatusPanel(Plugin):
             msg.state = False
             msg.wait = True
             result = gripper_open_proxy(msg)
+            rospy.logwarn(result.ack)
             self._widget.gripper_state_label.setText('CLOSED')
             self._widget.gripper_state_label.setStyleSheet('color:#ffffff;background-color:#6AAAC4')
             self._widget.msg_label.setText("GRIPPER CLOSED")
         except rospy.ServiceException, e:
-            print e
+            rospy.logwarn(e)
 
     def driver_status_cb(self,msg):
         self.driver_status = msg.data
@@ -198,10 +200,24 @@ class URStatusPanel(Plugin):
         else:
             print 'Freedrive is not enabled'
 
+    def reset(self):
+        self.freedrive = False
+        self._widget.freedrive_enable_label.setText('DISABLED')
+        self._widget.freedrive_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
+        self._widget.msg_label.setText("FREEDRIVE DISABLED")
+        self.servo = False
+        self._widget.servo_enable_label.setText('DISABLED')
+        self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
+        self._widget.msg_label.setText("SERVO DISABLED")
+
     def check_status(self):
         if self.driver_status == 'IDLE':
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EBCF1A')
+        elif self.driver_status == 'IDLE - WARN':
+            self._widget.mode_label.setText(str(self.driver_status))
+            self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#FF9100')
+            self.reset()
         elif self.driver_status == 'SERVO':
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#AFEB1A')
@@ -209,12 +225,12 @@ class URStatusPanel(Plugin):
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#1AA5EB')
         elif self.driver_status == 'DISCONNECTED':
-            self.servo = False
             self._widget.servo_enable_label.setText('DISABLED')
             self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
             self._widget.msg_label.setText("SERVO DISABLED")
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')
+            self.reset()
 
         if self.robot_state == 'POWER OFF':
             self._widget.status_label.setText(self.robot_state)
@@ -235,9 +251,12 @@ class URStatusPanel(Plugin):
         self.update_timeout += 1
         if self.update_timeout == 20:
             self.driver_status = 'DISCONNECTED'
+            self.robot_state == 'DISCONNECTED'
             rospy.logerr('STATUS PANEL HAS NOT HEARD FROM DRIVER... DISCONNECTED')
             self._widget.mode_label.setText('DISCONNECTED')
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')
+            self._widget.status_label.setText('DISCONNECTED')
+            self._widget.status_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
 
 
     # def stop_robot(self):

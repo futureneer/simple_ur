@@ -15,8 +15,8 @@ import urx
 import logging
 
 class URDriver():
-    MAX_ACC = .75
-    MAX_VEL = 1.5
+    MAX_ACC = 1.0
+    MAX_VEL = 1.8
     JOINT_NAMES = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
                'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
     
@@ -154,8 +154,10 @@ class URDriver():
 
         if mode['isEmergencyStopped']:
             self.robot_state = 'E-STOPPED'
+            self.driver_status = 'IDLE - WARN'
         elif mode['isSecurityStopped']:
             self.robot_state = 'SECURITY STOP'
+            self.driver_status = 'IDLE - WARN'
         elif mode['isProgramRunning']:
             self.robot_state ='RUNNING PROGRAM'
         else:

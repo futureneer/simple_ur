@@ -17,6 +17,7 @@ from simple_ur_msgs.srv import *
 import tf; from tf import *
 import tf_conversions as tf_c
 import rospkg
+import thread
 
 class URMarkerTeleopPanel(Plugin):
     def __init__(self,context):
@@ -54,6 +55,12 @@ class URMarkerTeleopPanel(Plugin):
         self.status = msg.data
 
     def servo_to_pose(self):
+        try:
+            thread.start_new_thread(self.servo_fn,('',0))
+        except Exception, errtxt:
+            rospy.logwarn(errtxt)
+
+    def servo_fn(self,val,*args):
 
         if self.status != 'SERVO':
             rospy.logwarn('ROBOT NOT IN SERVO MODE')
