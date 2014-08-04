@@ -2,11 +2,11 @@
 
 <launch>
 
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simple_ur_driver)/ur.rviz" />
+  <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simple_ur_driver)/ur.rviz" /> -->
 
-  <node name="simple_ur" pkg="simple_ur_driver" type="ur_driver.py" output="screen" />
+  <node name="simple_ur" pkg="simple_ur_driver" type="ur_driver.py" output="screen"/>
 
-  <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args="-.109 -.72 1.47 3.1415 0 -1.5707 /world /target_frame 10"/> -->
+  <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args="-.109 -.72 1.47 3.1415 0 -1.5707 /world /target_frame 10"/>
 
   <node pkg="tf" type="static_transform_publisher" name="world_to_base_link" args=" 0 0 1.4605 3.1415 0 -2.3565 /world /base_link 10"/>
 
@@ -30,7 +30,7 @@
   </node>
   
   <!-- gripper model -->
-<!--   <group ns="/ur5/gripper">
+  <group ns="/ur5/gripper">
     <arg name="model" default="$(find robotiq_c_model_visualization)/cfg/robotiq_c_model.urdf" />
     <arg name="gui" default="False" />
     <param name="robot_description" textfile="$(arg model)" />
@@ -45,5 +45,5 @@
       source_list: [/ur5/gripper/joint_states]
     </rosparam>
   </group>
- -->  
+  
 </launch>

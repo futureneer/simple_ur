@@ -15,8 +15,8 @@ import urx
 import logging
 
 class URDriver():
-    MAX_ACC = 1.0
-    MAX_VEL = 1.0
+    MAX_ACC = .75
+    MAX_VEL = 1.5
     JOINT_NAMES = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
                'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
     
@@ -133,6 +133,8 @@ class URDriver():
             T = tf_c.fromMsg(req.target)
             a,axis = T.M.GetRotAngle()
             pose = list(T.p) + [a*axis[0],a*axis[1],a*axis[2]]
+            acceleration = req.accel
+            velocity = req.vel
             self.rob.movel(pose,acc=self.MAX_ACC,vel=self.MAX_VEL)
             return 'SUCCESS - moved to pose'
         else:

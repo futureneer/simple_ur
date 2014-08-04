@@ -1,5 +1,5 @@
-geometry_msgs/Pose pose
-float32 acceleration
-float32 velocity
+geometry_msgs/Pose target
+float32 accel
+float32 vel
 ---
 string ack

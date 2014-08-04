@@ -234,6 +234,7 @@ class URStatusPanel(Plugin):
 
         self.update_timeout += 1
         if self.update_timeout == 20:
+            self.driver_status = 'DISCONNECTED'
             rospy.logerr('STATUS PANEL HAS NOT HEARD FROM DRIVER... DISCONNECTED')
             self._widget.mode_label.setText('DISCONNECTED')
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')

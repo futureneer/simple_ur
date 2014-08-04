@@ -35,7 +35,7 @@ class URMarkerTeleopPanel(Plugin):
         # Add widget to the user interface
         context.add_widget(self._widget)
 
-        self.status_sub = rospy.Subscriber('/ur_robot/state',String,self.status_cb)
+        self.status_sub = rospy.Subscriber('/ur_robot/driver_status',String,self.status_cb)
         # Parameters
         self.status = 'DISCONNECTED'
         self.servo_enable = False
@@ -59,7 +59,7 @@ class URMarkerTeleopPanel(Plugin):
             rospy.logwarn('ROBOT NOT IN SERVO MODE')
             return
         else:
-            rospy.wait_for_service('/simple_ur_msgs/Servo')
+            rospy.wait_for_service('/simple_ur_msgs/ServoToPose')
             try:
                 pose_servo_proxy = rospy.ServiceProxy('/simple_ur_msgs/ServoToPose',ServoToPose)
                 
@@ -68,7 +68,7 @@ class URMarkerTeleopPanel(Plugin):
                 F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
                 F_command = F_base_world.Inverse()*F_target_world
                     
-                msg = simple_ur_msgs.srv.ServoToPoseRequest()
+                msg = ServoToPoseRequest()
                 msg.target = tf_c.toMsg(F_command)
                 msg.accel = .7
                 msg.vel = .3
