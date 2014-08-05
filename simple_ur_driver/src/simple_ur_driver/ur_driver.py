@@ -133,9 +133,17 @@ class URDriver():
             T = tf_c.fromMsg(req.target)
             a,axis = T.M.GetRotAngle()
             pose = list(T.p) + [a*axis[0],a*axis[1],a*axis[2]]
-            acceleration = req.accel
-            velocity = req.vel
-            self.rob.movel(pose,acc=self.MAX_ACC,vel=self.MAX_VEL)
+            # Check acceleration and velocity limits
+            if req.accel > self.MAX_ACC:
+                acceleration = self.MAX_ACC
+            else:
+                acceleration = req.accel
+            if req.vel > self.MAX_VEL:
+                velocity = self.MAX_VEL
+            else:
+                velocity = req.vel
+            # Send command
+            self.rob.movel(pose,acc=acceleration,vel=velocity)
             return 'SUCCESS - moved to pose'
         else:
             rospy.logerr('SIMPLE UR -- Not in servo mode')
