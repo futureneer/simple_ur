@@ -25,61 +25,6 @@ class URDriver():
     MULT_time = 1000000.0
     MULT_blend = 1000.0
 
-    SERVO_PROG='''def servoProg():
-  MULT_jointstate = 10000.0
-  MULT_time = 1000000.0
-  MULT_blend = 1000.0
-  MSG_QUIT = 0
-  MSG_MOVEL = `
-  MULT_jointstate = 10000.0
-  MULT_time = 1000000.0
-  MULT_blend = 1000.0
-  
-  socket_open(HOSTNAME, 30000)
-
-  while True:
-    read_from_socket = socket_read_binary_integer(1)
-
-    if read_from_socket[0] == 0:
-      textmsg("Got Noting")
-    elif read_from_socket[0] > 1:
-      textmsg("Received too many things")
-    else:
-      mtype = read_from_socket[1]
-
-      if mtype == MSG_QUIT:
-        textmsg("Received QUIT")
-        break
-
-      elif mtype == MSG_MOVEL:
-        textmsg("Received movel")
-        params_mult = socket_read_binary_integer(1+6+2)
-        if params_mult[0] == 0:
-          textmsg("Received no parameters for movel message")
-        end
-        # Unpacks the parameters
-        waypoint_id = params_mult[1]
-        pose = [params_mult[2] / MULT_jointstate,
-                   params_mult[3] / MULT_jointstate,
-                   params_mult[4] / MULT_jointstate,
-                   params_mult[5] / MULT_jointstate,
-                   params_mult[6] / MULT_jointstate,
-                   params_mult[7] / MULT_jointstate]
-        acc = params_mult[8] / MULT_jointstate
-        vel = params_mult[9] / MULT_jointstate
-        # Sends the command
-        textmsg(pose)
-        textmsg(acc)
-        textmsg(vel)
-        # movel(p[pose[0],pose[1],pose[2],pose[3],pose[4],pose[5]], a=acc, v=vel, t=0, r=0)
-      end
-    end
-  end
-end
-
-servoProg()
-
-'''    
     def __init__(self):
         rospy.init_node('ur_driver',anonymous=True)
         rospy.logwarn('SIMPLE_UR DRIVER LOADING')
@@ -146,21 +91,6 @@ servoProg()
             self.current_tcp_pose = tf_c.toMsg(T)
             self.current_tcp_frame = T
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
-
-    def test_servo_driver(self):
-        self._socket = socket.create_connection(("192.168.1.155", 30000), timeout=0.5)
-        self.rob.send_program(self.SERVO_PROG)
-        rospy.sleep(1)
-
-        # Testing sending message to robot
-        test_pose = [1,1,1,1.5,1.5,1.5]
-        test_accel = .5
-        test_vel = .5
-        params = [MSG_MOVEL, 0] + [MULT_jointstate * pp for pp in test_pose] + [MULT_jointstate * test_accel, MULT_jointstate * test_vel]
-        buf = struct.pack("!%ii" % len(params), *params)
-        with self.socket_lock:
-            self.request.send(buf)
-
 
     def check_driver_status(self):
         if self.driver_status == 'DISCONNECTED':
