@@ -2,6 +2,10 @@
 import rospy
 import numpy as np
 from copy import deepcopy
+import urx
+import logging
+import socket
+
 class PID:
     """
     Discrete PID control
@@ -84,6 +88,7 @@ def check_distance(a,b,val):
     v1 = np.array(a)
     v2 = np.array(b)
     res = np.sum(np.abs(np.subtract(v1,v2)))
+    # rospy.logwarn(res)
     if res < val:
         return True
     else:
@@ -93,57 +98,94 @@ if __name__ == "__main__":
 
 
     # rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
+    sock = socket.create_connection(('192.168.1.155', 30003), timeout=0.5)
+    print 'created socket'
     # rob.set_tcp((0,0,0,0,0,0))
     # rob.set_payload(0.5, (0,0,0))
+    rospy.sleep(1)
 
-    P = 0.01
-    I = 0.0
-    D = 0.01
+    for n in range(500):
+        vels = [0.0, 0.0, -0.1, 0.0, 0.0, 0.0]
+        acc = .1
+        vels.append(acc)
+        timeout = .008
+        vels.append(timeout)
+        prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vels)
+        # prog = "textmsg({})\n".format(n)
+        if type(prog) != bytes:
+            prog = prog.encode()
+        print 'sending command ['+str(prog)+']'
+        sock.send(prog)
+        rospy.sleep(.007)
 
-    pids = []
-    for i in range(6):
-        pids.append(PID(P,I,D))
+    rospy.sleep(1)
+    sock.close() 
+    # P = 1.0
+    # I = 0.0
+    # D = 0.1
 
-    ### Get init pose
-    # start_pose = rob.getl()
-    start_pose = [1.0, 1.0, 1.0, 1.507, 0.0, -1.507]
-    current_pose = [1.0, 1.0, 1.0, 1.507, 0.0, -1.507]
+    # pids = []
+    # for i in range(6):
+    #     pids.append(PID(P,I,D))
 
-    ### Create Command Pose
-    command_pose = list(start_pose)
-    command_pose[2] = command_pose[2] + 1
+    # ### Get init pose
+    # start_pose = current_pose = rob.getl()
+    # # start_pose = [1.0, 1.0, 1.0, 1.507, 0.0, -1.507]
+    # # current_pose = [1.0, 1.0, 1.0, 1.507, 0.0, -1.507]
 
-    for p, i in zip(pids, range(6)):
-        p.setPoint(command_pose[i])
+    # ### Create Command Pose
+    # command_pose = list(start_pose)
+    # command_pose[2] = command_pose[2] - .2
 
-    print 'Start Pose: '+ str(start_pose)
-    print 'End Pose; '+str(command_pose)
+    # for p, i in zip(pids, range(6)):
+    #     p.setPoint(command_pose[i])
 
-    vel_command_last = []
+    # print 'Start Pose: '+ str(start_pose)
+    # print 'End Pose; '+str(command_pose)
 
-    # while not check_distance(start_pose,command_pose,.001):
-    while True:
-        # Get current values
-        # current_pose = rob.getl()
+    # vel_command_last = []
+    # # rob.movel(command_pose,.1,.06)
+    # # rob.speedl([0,0,.1,0,0,0],.1,1)
 
-        vel_command = []
-        for p, i in zip(pids, range(6)):
-            up = p.update(current_pose[i])
-            vel_command.append(up)
+    # while not check_distance(command_pose,current_pose,.001):
+    #     # Get current values
+    #     current_pose = rob.getl()
 
-        vel_command_last = list(vel_command)
+    #     vel_command = []
+    #     for p, i in zip(pids, range(6)):
+    #         up = p.update(current_pose[i])
+    #         vel_command.append(up)
 
-        # rob.speedl(velocities=vel_command, acc=.1, min_time=.01)
+    #     V = []
+    #     for v,i in zip(vel_command,range(6)):
+    #         if v > 0:
+    #             if v > 1.5:
+    #                 vel_command[i] = 1.5
+    #         else:
+    #             if v < -1.5:
+    #                 vel_command[i] = -1.5
+
+    #     vel_command_last = list(vel_command)
+
+    #     rob.speedl(velocities=vel_command, acc=.5, min_time=0.1, direct=True)
         
-        print vel_command
-        print current_pose
-        result = []
-        for c,v in zip(current_pose,vel_command):
-            result.append(c+v)
-        print result
-        current_pose = list(result)
+    #     # print vel_command
+    #     # print current_pose
+    #     # result = []
+    #     # for c,v in zip(current_pose,vel_command):
+    #         # result.append(c+v)
+    #     # print result
+    #     # current_pose = list(result)
 
-        rospy.sleep(.01)
+    #     rospy.sleep(.1)
+
+    # rob.stopl(.1)
+
+
+    # rob.cleanup()
+
+
+
     # Simulate
 
     # p=PID(.01,0.0,.01)
