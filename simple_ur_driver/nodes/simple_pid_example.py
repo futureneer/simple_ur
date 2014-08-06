@@ -108,7 +108,7 @@ if __name__ == "__main__":
     rospy.sleep(1)
 
     for n in range(100):
-        vels = [0.0, 0.0, 0.1, 0.0, 0.0, 0.0]
+        vels = [0.0, 0.0, -0.1, 0.0, 0.0, 0.0]
         acc = .1
         vels.append(acc)
         timeout = .05
@@ -119,9 +119,9 @@ if __name__ == "__main__":
             prog = prog.encode()
         print 'sending command ['+str(prog)+']'
         sock.send(prog)
-        # print realtime_monitor.get_all_data()['tcp'][2]
-        rospy.sleep(.045)
+        print realtime_monitor.get_all_data()['tcp'][2]
         # sock.recv(1044)
+        rospy.sleep(.045)
 
     rospy.sleep(1)
     sock.close() 
