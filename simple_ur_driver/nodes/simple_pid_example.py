@@ -119,13 +119,15 @@ if __name__ == "__main__":
             prog = prog.encode()
         print 'sending command ['+str(prog)+']'
         sock.send(prog)
-        print realtime_monitor.get_all_data()['tcp'][2]
+        print realtime_monitor.get_all_data(wait=False)['tcp'][2]
         # sock.recv(1044)
         rospy.sleep(.045)
 
     rospy.sleep(1)
     sock.close() 
     rob.cleanup()
+
+
     # P = 1.0
     # I = 0.0
     # D = 0.1
