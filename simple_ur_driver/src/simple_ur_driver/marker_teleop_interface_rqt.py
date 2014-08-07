@@ -36,23 +36,54 @@ class URMarkerTeleopPanel(Plugin):
         # Add widget to the user interface
         context.add_widget(self._widget)
 
-        self.status_sub = rospy.Subscriber('/ur_robot/driver_status',String,self.status_cb)
+        self.driver_status_sub = rospy.Subscriber('/ur_robot/driver_status',String,self.driver_status_cb)
+        self.target_pub = rospy.Publisher('/ur_robot/follow_goal',PoseStamped)
+
         # Parameters
-        self.status = 'DISCONNECTED'
-        self.servo_enable = False
+        self.driver_status = 'DISCONNECTED'
+        self.follow = False
         self.listener_ = TransformListener()
         self.broadcaster_ = TransformBroadcaster()
 
         self._widget.servo_to_btn.clicked.connect(self.servo_to_pose)
 
-        # if self.status == 'DISCONNECTED':
-        #     rospy.logwarn('WARNING <<< DID NOT HEAR FROM ROBOT')
-        #     rospy.sleep(1)
-        
+        self._widget.follow_start_btn.clicked.connect(self.follow_start)
+        self._widget.follow_stop_btn.clicked.connect(self.follow_stop)
+
+        self.update_timer_ = QTimer(self)
+        self.connect(self.update_timer_, QtCore.SIGNAL("timeout()"),self.update)
+        self.update_timer_.start(100)
+
         rospy.logwarn('MARKER TELEOP INTERFACE READY')
 
+    def follow_stop(self):
+        self.follow = False
+
+    def follow_start(self):
+        if self.driver_status == 'FOLLOW':
+            self.follow = True
+        else:
+            rospy.logwarn('The Driver is not in follow mode')
+
+    def update(self):
+        if self.follow == True:
+            try:
+                F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
+                F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
+                F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
+                F_command = F_base_world.Inverse()*F_target_world
+
+                cmd = PoseStamped()
+                cmd.pose = tf_c.toMsg(F_command)
+                self.target_pub.publish(cmd)
+
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+                rospy.logwarn(str(e))
+
     def status_cb(self,msg):
-        self.status = msg.data
+        self.driver_status = msg.data
+        if not self.driver_status == 'FOLLOW':
+            self.follow = False
 
     def servo_to_pose(self):
         try:
@@ -61,8 +92,7 @@ class URMarkerTeleopPanel(Plugin):
             rospy.logwarn(errtxt)
 
     def servo_fn(self,val,*args):
-
-        if self.status != 'SERVO':
+        if self.driver_status != 'SERVO':
             rospy.logwarn('ROBOT NOT IN SERVO MODE')
             return
         else:

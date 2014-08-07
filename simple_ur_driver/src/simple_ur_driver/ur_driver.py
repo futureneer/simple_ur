@@ -7,12 +7,17 @@ import PyKDL
 # MSGS and SERVICES
 from simple_ur_msgs.srv import *
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import *
 import time
+import threading
+import socket
 # URX Universal Robot Driver
 import urx
 # OTHER
 import logging
+import numpy as np
+from pid import PID
 
 class URDriver():
     MAX_ACC = 1.0
@@ -40,6 +45,7 @@ class URDriver():
         self.driver_status_publisher = rospy.Publisher('/ur_robot/driver_status',String)
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
+        self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
@@ -50,23 +56,48 @@ class URDriver():
         else:
             rospy.logwarn('SIMPLE UR - ROBOT CONNECTED SUCCESSFULLY')
             self.rtm = self.rob.get_realtime_monitor()
-            rospy.logwarn('SIMPLE UR - GOT REAL TIME INTERFACE TO ROBOT')        
+            rospy.logwarn('SIMPLE UR - GOT REAL TIME <READ> INTERFACE TO ROBOT')
+            self.rt_socket = socket.create_connection(('192.168.1.155', 30003), timeout=0.5)
+            rospy.logwarn('SIMPLE UR - GOT REAL TIME <WRITE> INTERFACE TO ROBOT')        
             self.driver_status = 'IDLE'
 
         ### Set Up PID ###
+        self.P = 1.0
+        self.I = 0.0
+        self.D = 0.1
+        self._pid = []
+        self.follow_accel = .1
+        self.follow_timeout = .01
+        self.follow_sleep = .006
+        self.follow_goal_reached = True
+        self.pid_lock = threading.Lock()
+        self.reset_follow_goal()
+        for i in range(6):
+            self._pid.append(PID(self.P,self.I,self.D))
 
-
+        ### START LOOP ###
         while not rospy.is_shutdown():
             self.update()
             self.check_driver_status()
             self.check_robot_state()
             self.publish_status()
-            rospy.sleep(.01)
+            if self.driver_status == 'FOLLOW':
+                self.update_follow()
+            # Sleep between commands to robot
+            rospy.sleep(self.follow_sleep)
 
         # Finish
         rospy.logwarn('SIMPLE UR - ROBOT INTERFACE CLOSING')
+        self.rob.cleanup()
+        rospy.logwarn('SIMPLE UR - Robot Cleaning Up')
         self.rob.shutdown()
+        rospy.logwarn('SIMPLE UR - Robot Interface Shut Down')
+        self.rt_socket.close()
+        rospy.logwarn('SIMPLE UR - Real Time <WRITE> Socket Closed')
 
+    def reset_follow_goal(self):
+        self.follow_goal_axis_angle = self.current_axis_angle = self.rtm.get_all_data(wait=False)['tcp']
+        
     def update(self):
         if not self.driver_status == 'DISCONNECTED':
             # Get Joint Positions
@@ -95,6 +126,68 @@ class URDriver():
             self.current_tcp_frame = T
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
+    def update_follow(self):
+        if not self.follow_goal_reached:
+            # Get current pose as axis-angle
+            self.current_axis_angle = self.rtm.get_all_data(wait=False)['tcp']
+            # DEBUG Print current and goal positions
+            rospy.loginfo('Current: <'+str(self.current_axis_angle)+'>')
+            rospy.loginfo('Goal: <'+str(self.follow_goal_axis_angle)+'>')
+            #
+            vel_cmd = []
+            # append a velocity update for each parameter to command velocities
+            with self.pid_lock:
+                for pid, p in zip(self._pid, self.current_axis_angle):
+                    vel_cmd.append(pid.update(p))
+            # Check velocities against limits
+            for v, i in zip(vel_cmd, range(6)):
+                if v > 0:
+                    if v > self.MAX_VEL:
+                        vel_command[i] = self.MAX_VEL
+                else:
+                    if v < -self.MAX_VEL:
+                        vel_command[i] = -self.MAX_VEL
+            # Append other parameters to vel command
+            vel_cmd.append(self.follow_accel)
+            vel_cmd.append(self.follow_timeout)
+            # Create and clean up program
+            prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vel_command)
+            if type(prog) != bytes:
+                prog = prog.encode()
+            # Send command to socket
+            # self.rt_socket.send() 
+        
+        # Check to see if follow goal is reached
+        if self.reached_goal(self.follow_goal_axis_angle, self.current_axis_angle, .001):
+            rospy.logwarn('SIMPLE UR - Follow Goal Reached')
+            self.follow_goal_reached = True
+        else:
+            self.follow_goal_reached = False
+
+    def follow_goal_cb(self,msg):
+        if self.driver_status == 'FOLLOW':
+            # Set follow goal pose as axis-angle
+            F_goal = tf_c.fromMsg(msg.pose)
+            a,axis = F_goal.M.GetRotAngle()
+            self.follow_goal_axis_angle = list(F_goal.p) + [a*axis[0],a*axis[1],a*axis[2]]
+            # Set goal pose as PID set point
+            with self.pid_lock:
+                for pid, g in zip(self._pid, self.follow_goal_axis_angle):
+                    pid.setPoint(g)
+        else:
+            rospy.logerr("FOLLOW NOT ENABLED!")
+
+
+    def reached_goal(self,a,b,val):
+        ''' returns true if distance is SMALLER than val'''
+        v1 = np.array(a)
+        v2 = np.array(b)
+        res = np.sum(np.abs(np.subtract(v1,v2)))
+        # print res
+        if res < val:
+            return True
+        else:
+            return False
 
     def check_driver_status(self):
         if self.driver_status == 'DISCONNECTED':
@@ -133,9 +226,11 @@ class URDriver():
                 return 'SUCCESS - servo mode enabled'
             elif req.mode == 'FOLLOW':
                 self.driver_status = 'FOLLOW'
+                self.reset_follow_goal()
                 return 'SUCCESS - follow mode enabled'
             elif req.mode == 'DISABLE':
                 self.driver_status = 'IDLE'
+                self.reset_follow_goal()
                 return 'SUCCESS - servo mode disabled'
 
     def set_stop_call(self,req):
@@ -185,9 +280,6 @@ class URDriver():
             self.robot_state ='RUNNING PROGRAM'
         else:
             self.robot_state = 'RUNNING IDLE'
-
-
-
 
 
 if __name__ == "__main__":
