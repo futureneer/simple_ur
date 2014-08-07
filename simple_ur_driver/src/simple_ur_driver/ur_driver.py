@@ -8,7 +8,7 @@ import PyKDL
 from simple_ur_msgs.srv import *
 from sensor_msgs.msg import JointState
 from std_msgs.msg import *
-
+import time
 # URX Universal Robot Driver
 import urx
 # OTHER
@@ -42,16 +42,19 @@ class URDriver():
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
 
         ### Set Up Robot ###
-        self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)        
+        self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
         if not self.rob:
             rospy.logwarn('SIMPLE UR  - ROBOT NOT CONNECTED')
             self.driver_status = 'DISCONNECTED'
             self.robot_state = 'POWER OFF'
         else:
             rospy.logwarn('SIMPLE UR - ROBOT CONNECTED SUCCESSFULLY')
+            self.rtm = self.rob.get_realtime_monitor()
+            rospy.logwarn('SIMPLE UR - GOT REAL TIME INTERFACE TO ROBOT')        
             self.driver_status = 'IDLE'
-            self.rob.set_tcp((0,0,0,0,0,0))
-            self.rob.set_payload(1.5, (0,0,0))
+
+        ### Set Up PID ###
+
 
         while not rospy.is_shutdown():
             self.update()
@@ -92,12 +95,15 @@ class URDriver():
             self.current_tcp_frame = T
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
+
     def check_driver_status(self):
         if self.driver_status == 'DISCONNECTED':
             pass
         elif self.driver_status == 'IDLE': 
             pass
         elif self.driver_status == 'SERVO': 
+            pass
+        elif self.driver_status == 'FOLLOW': 
             pass
         elif self.driver_status == 'TEACH': 
             pass
@@ -121,12 +127,16 @@ class URDriver():
             rospy.logwarn('SIMPLE UR -- cannot enter servo mode, teach mode is active')
             return 'FAILED - teach mode is active'
         else:
-            if req.enable == True:
+            rospy.logwarn('MODE IS ['+req.mode+']')
+            if req.mode == 'SERVO':
                 self.driver_status = 'SERVO'
                 return 'SUCCESS - servo mode enabled'
-            else:
+            elif req.mode == 'FOLLOW':
+                self.driver_status = 'FOLLOW'
+                return 'SUCCESS - follow mode enabled'
+            elif req.mode == 'DISABLE':
                 self.driver_status = 'IDLE'
-                return 'SUCCESS - teach mode disabled'
+                return 'SUCCESS - servo mode disabled'
 
     def set_stop_call(self,req):
         rospy.logwarn('SIMPLE UR - STOPPING ROBOT')

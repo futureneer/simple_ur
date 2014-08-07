@@ -37,8 +37,8 @@ class URStatusPanel(Plugin):
         context.add_widget(self._widget)
 
         # # Parameters
-        self.freedrive = False
-        self.servo = False
+        # self.freedrive = False
+        # self.servo = 'DISABLED'
         self.listener_ = TransformListener()
 
         self.driver_status_sub = rospy.Subscriber('/ur_robot/driver_status',String,self.driver_status_cb)
@@ -47,6 +47,7 @@ class URStatusPanel(Plugin):
         self._widget.freedrive_enable_btn.clicked.connect(self.freedrive_enable)
         self._widget.freedrive_disable_btn.clicked.connect(self.freedrive_disable)
         self._widget.servo_enable_btn.clicked.connect(self.servo_enable)
+        self._widget.servo_follow_btn.clicked.connect(self.servo_follow)
         self._widget.servo_disable_btn.clicked.connect(self.servo_disable)
 
         self._widget.gripper_open_btn.clicked.connect(self.gripper_open)
@@ -105,83 +106,100 @@ class URStatusPanel(Plugin):
         self.update_timeout = 0
 
     def robot_state_cb(self,msg):
+        # get data
         self.robot_state = msg.data
 
     def servo_enable(self):
-        # rospy.logwarn('trying to enabling servo')
-        if self.freedrive == False:
-            if self.servo == False:
-                try:
-                    rospy.wait_for_service('/simple_ur_msgs/SetServoMode',2)
-                except rospy.ROSException as e:
-                    print 'Could not find SetServoMode service'
-                    self._widget.msg_label.setText("NO SERVO_ENABLE SERVICE")
-                    return
-                try:
-                    servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
-                    result = servo_mode_service(True)
-                    rospy.logwarn(result.ack)
-                    self.servo = True
-                    self._widget.servo_enable_label.setText('ENABLED')
-                    self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#ADE817')
-                    self._widget.msg_label.setText("SERVO ENABLED")
-                except rospy.ServiceException, e:
-                    print e
-            else:
-                self._widget.msg_label.setText('SERVO ALREAD ENABLED')
+        if self.driver_status == 'IDLE':
+            try:
+                rospy.wait_for_service('/simple_ur_msgs/SetServoMode',2)
+            except rospy.ROSException as e:
+                print 'Could not find SetServoMode service'
+                self._widget.msg_label.setText("NO SERVO_ENABLE SERVICE")
+                return
+            try:
+                servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
+                result = servo_mode_service('SERVO')
+                rospy.logwarn(result.ack)
+                # self.servo = 'SERVO'
+                self._widget.servo_enable_label.setText('SERVO')
+                self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#ADE817')
+                self._widget.msg_label.setText("SERVO ENABLED")
+            except rospy.ServiceException, e:
+                print e
         else:
-            self._widget.msg_label.setText("CANT SERVO, FREEDRIVE ENABLED")
+            self._widget.msg_label.setText("DRIVER MUST BE IDLE TO ENGAGE SERVO")
+            rospy.logwarn('FAILED, driver is in ['+self.driver_status+'] mode.')
+        
+    def servo_follow(self):
+        # rospy.logwarn('trying to enabling servo')
+        if self.driver_status == 'IDLE':
+            try:
+                rospy.wait_for_service('/simple_ur_msgs/SetServoMode',2)
+            except rospy.ROSException as e:
+                print 'Could not find SetServoMode service'
+                self._widget.msg_label.setText("NO FOLLOW_ENABLE SERVICE")
+                return
+            try:
+                servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
+                result = servo_mode_service('FOLLOW')
+                rospy.logwarn(result.ack)
+                # self.servo = 'FOLLOW'
+                self._widget.servo_enable_label.setText('FOLLOWING')
+                self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#34D1B4')
+                self._widget.msg_label.setText("FOLLOWING ENABLED")
+            except rospy.ServiceException, e:
+                print e
+        else:
+            self._widget.msg_label.setText("DRIVER MUST BE IDLE TO ENGAGE FOLLOW")
+            rospy.logwarn('FAILED, driver is in ['+self.driver_status+'] mode.')
 
     def servo_disable(self):
-        if self.freedrive == False:
-            if self.servo == True:
-                    try:
-                        rospy.wait_for_service('/simple_ur_msgs/SetServoMode',2)
-                    except rospy.ROSException as e:
-                        print 'Could not find SetServoMode service'
-                        self._widget.msg_label.setText("NO SERVO_ENABLE SERVICE")
-                        return
-                    try:
-                        servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
-                        result = servo_mode_service(False)
-                        rospy.logwarn(result.ack)
-                        self.servo = False
-                        self._widget.servo_enable_label.setText('DISABLED')
-                        self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
-                        self._widget.msg_label.setText("SERVO DISABLED")
-                    except rospy.ServiceException, e:
-                        print e
-            else:
-                 self._widget.msg_label.setText("SERVO IS NOT ENABLED")  
+        if self.driver_status == 'SERVO' or self.driver_status == 'FOLLOW':
+            try:
+                rospy.wait_for_service('/simple_ur_msgs/SetServoMode',2)
+            except rospy.ROSException as e:
+                print 'Could not find SetServoMode service'
+                self._widget.msg_label.setText("NO SERVO_ENABLE SERVICE")
+                return
+            try:
+                servo_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetServoMode',SetServoMode)
+                result = servo_mode_service('DISABLE')
+                rospy.logwarn(result.ack)
+                # self.servo = 'DISABLE'
+                self._widget.servo_enable_label.setText('DISABLED')
+                self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
+                self._widget.msg_label.setText("SERVO DISABLED")
+            except rospy.ServiceException, e:
+                print e
         else:
-            self._widget.msg_label.setText("CANT DISABLE SERVO, FREEDRIVE ENABLED")
+            self._widget.msg_label.setText("DRIVER MUST BE IN SERVO OR FOLLOW MODE TO DISABLE")
+            rospy.logwarn('FAILED, driver is in ['+self.driver_status+'] mode.')
 
+            
     def freedrive_enable(self):
-        # rospy.logwarn('trying to enabling freedrive')
-        if self.servo == False:
-            if self.freedrive == False:
-                try:
-                    rospy.wait_for_service('/simple_ur_msgs/SetTeachMode',2)
-                except rospy.ROSException as e:
-                    print 'Could not find freedrive service'
-                    return
-                try:
-                    teach_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetTeachMode',SetTeachMode)
-                    result = teach_mode_service(True)
-                    rospy.logwarn(result.ack)
-                    self.freedrive = True
-                    self._widget.freedrive_enable_label.setText('ENABLED')
-                    self._widget.freedrive_enable_label.setStyleSheet('color:#ffffff;background-color:#ADE817')
-                    self._widget.msg_label.setText("FREEDRIVE ENABLED")
-                except rospy.ServiceException, e:
-                    print e
-            else:
-                self._widget.msg_label.setText("FREEDRIVE IS ALREADY ENABLED")
+        if self.driver_status == 'IDLE':
+            try:
+                rospy.wait_for_service('/simple_ur_msgs/SetTeachMode',2)
+            except rospy.ROSException as e:
+                print 'Could not find freedrive service'
+                return
+            try:
+                teach_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetTeachMode',SetTeachMode)
+                result = teach_mode_service(True)
+                rospy.logwarn(result.ack)
+                # self.freedrive = True
+                self._widget.freedrive_enable_label.setText('ENABLED')
+                self._widget.freedrive_enable_label.setStyleSheet('color:#ffffff;background-color:#ADE817')
+                self._widget.msg_label.setText("FREEDRIVE ENABLED")
+            except rospy.ServiceException, e:
+                print e
         else:
-            self._widget.msg_label.setText("CANT FREEDRIVE, SERVO ENABLED")
+            self._widget.msg_label.setText("DRIVER MUST BE IDLE TO ENGAGE TEACH")
+            rospy.logwarn('FAILED, driver is in ['+self.driver_status+'] mode.')
 
     def freedrive_disable(self):
-        if self.freedrive == True:
+        if self.driver_status == 'TEACH':
             try:
                 rospy.wait_for_service('/simple_ur_msgs/SetTeachMode',2)
             except rospy.ROSException as e:
@@ -191,21 +209,22 @@ class URStatusPanel(Plugin):
                 teach_mode_service = rospy.ServiceProxy('/simple_ur_msgs/SetTeachMode',SetTeachMode)
                 result = teach_mode_service(False)
                 rospy.logwarn(result.ack)
-                self.freedrive = False
+                # self.freedrive = False
                 self._widget.freedrive_enable_label.setText('DISABLED')
                 self._widget.freedrive_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
                 self._widget.msg_label.setText("FREEDRIVE DISABLED")
             except rospy.ServiceException, e:
                 print e
         else:
-            print 'Freedrive is not enabled'
+            self._widget.msg_label.setText("DRIVER MUST BE IN TEACH MODE TO DISABLE")
+            rospy.logwarn('FAILED, driver is in ['+self.driver_status+'] mode.')
 
     def reset(self):
-        self.freedrive = False
+        # self.freedrive = False
         self._widget.freedrive_enable_label.setText('DISABLED')
         self._widget.freedrive_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
         self._widget.msg_label.setText("FREEDRIVE DISABLED")
-        self.servo = False
+        # self.servo = 'DISABLE'
         self._widget.servo_enable_label.setText('DISABLED')
         self._widget.servo_enable_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
         self._widget.msg_label.setText("SERVO DISABLED")
@@ -221,6 +240,9 @@ class URStatusPanel(Plugin):
         elif self.driver_status == 'SERVO':
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#AFEB1A')
+        elif self.driver_status == 'FOLLOW':
+            self._widget.mode_label.setText(str(self.driver_status))
+            self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#34D1B4')
         elif self.driver_status == 'TEACH':
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#1AA5EB')
@@ -257,7 +279,6 @@ class URStatusPanel(Plugin):
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')
             self._widget.status_label.setText('DISCONNECTED')
             self._widget.status_label.setStyleSheet('color:#ffffff;background-color:#FF9100')
-
 
     # def stop_robot(self):
     #     rospy.wait_for_service('/simple_ur_msgs/stop')

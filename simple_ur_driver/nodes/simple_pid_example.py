@@ -128,7 +128,7 @@ if __name__ == "__main__":
     # rob.cleanup()
 
 
-    P = 10.0
+    P = 1.0
     I = 0.0
     D = 0.1
 
