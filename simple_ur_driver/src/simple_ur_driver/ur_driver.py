@@ -20,7 +20,7 @@ import numpy as np
 from pid import PID
 
 class URDriver():
-    MAX_ACC = 1.0
+    MAX_ACC = .5
     MAX_VEL = 1.8
     JOINT_NAMES = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
                'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
@@ -62,13 +62,14 @@ class URDriver():
             self.driver_status = 'IDLE'
 
         ### Set Up PID ###
-        self.P = 1.0
+        self.P = 20.0
         self.I = 0.0
         self.D = 0.0
         self._pid = []
         self.follow_accel = .1
-        self.follow_timeout = .01
-        self.follow_sleep = .006
+        self.follow_timeout = .008
+        # self.follow_sleep = .008
+        self.follow_rate = rospy.Rate(125)
         self.follow_goal_reached = True
         self.pid_lock = threading.Lock()
         self.reset_follow_goal()
@@ -91,7 +92,8 @@ class URDriver():
                 self.current_axis_angle = D
 
             # Sleep between commands to robot
-            rospy.sleep(self.follow_sleep)
+            # rospy.sleep(self.follow_sleep)
+            self.follow_rate.sleep()
 
         # Finish
         rospy.logwarn('SIMPLE UR - ROBOT INTERFACE CLOSING')
@@ -150,8 +152,15 @@ class URDriver():
                 else:
                     if v < -self.MAX_VEL:
                         vel_cmd[i] = -self.MAX_VEL
+            # Scale Acceleration
+            vel_avg = abs(sum(vel_cmd)/6.0)
+            acc_scale = (vel_avg/self.MAX_VEL)
+            scaled_accel = self.MAX_ACC*acc_scale
+            # clamp lower accel limit
+            if scaled_accel < .05: scaled_accel = .05
             # Append other parameters to vel command
-            vel_cmd.append(self.follow_accel)
+            vel_cmd.append(scaled_accel)
+            # print 'acc: '+str(scaled_accel)+' avg vel: '+str(vel_avg)
             vel_cmd.append(self.follow_timeout)
             # Create and clean up program
             prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vel_cmd)

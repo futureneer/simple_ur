@@ -41,14 +41,15 @@ class URMarkerTeleopPanel(Plugin):
 
         # Parameters
         self.driver_status = 'DISCONNECTED'
-        self.follow = False
+        self.follow = 'DISABLED'
         self.listener_ = TransformListener()
         self.broadcaster_ = TransformBroadcaster()
 
         self._widget.servo_to_btn.clicked.connect(self.servo_to_pose)
 
-        self._widget.follow_start_btn.clicked.connect(self.follow_start)
+        self._widget.follow_marker_btn.clicked.connect(self.follow_marker)
         self._widget.follow_stop_btn.clicked.connect(self.follow_stop)
+        self._widget.follow_interact_btn.clicked.connect(self.follow_interact)
 
         self.update_timer_ = QTimer(self)
         self.connect(self.update_timer_, QtCore.SIGNAL("timeout()"),self.update)
@@ -57,21 +58,39 @@ class URMarkerTeleopPanel(Plugin):
         rospy.logwarn('MARKER TELEOP INTERFACE READY')
 
     def follow_stop(self):
-        self.follow = False
+        self.follow = 'DISABLED'
         rospy.logwarn('FOLLOWING STOPPED')
 
-    def follow_start(self):
+    def follow_marker(self):
         if self.driver_status == 'FOLLOW':
-            self.follow = True
-            rospy.logwarn('FOLLOWING MARKER')
+            if self.follow == 'INTERACT':
+                rospy.logwarn('Already following INTERACT')
+            else:
+                self.follow = 'MARKER'
+                rospy.logwarn('FOLLOWING MARKER')
+        else:
+            rospy.logwarn('The Driver is not in follow mode')
+
+    def follow_interact(self):
+        if self.driver_status == 'FOLLOW':
+            if self.follow == 'MARKER':
+                rospy.logwarn('Already following MARKER')
+            else:
+                self.follow = 'INTERACT'
+                rospy.logwarn('FOLLOWING INTERACT')
         else:
             rospy.logwarn('The Driver is not in follow mode')
 
     def update(self):
-        if self.follow == True:
+        if not self.follow == 'DISABLED':
             try:
-                F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
-                F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
+                if self.follow == 'MARKER':
+                    F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
+                    F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
+                elif self.follow == 'INTERACT':
+                    F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/endpoint_interact',rospy.Time(0)))
+                    F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/endpoint_interact',rospy.Time(0)))
+
                 F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
                 F_command = F_base_world.Inverse()*F_target_world
 
@@ -85,7 +104,7 @@ class URMarkerTeleopPanel(Plugin):
     def driver_status_cb(self,msg):
         self.driver_status = msg.data
         if not self.driver_status == 'FOLLOW':
-            if self.follow == True:
+            if not self.follow == 'DISABLED':
                 rospy.logwarn('The Driver left follow mode, follow disabled')
                 self.follow_stop()
 

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>300</width>
-    <height>319</height>
+    <height>345</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -45,7 +45,7 @@
       <string notr="true">background-color:#3FC4FC;color:#ffffff</string>
      </property>
      <property name="text">
-      <string>UR5 Marker Teleop</string>
+      <string>UR5 Teleop</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignCenter</set>
@@ -106,11 +106,11 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="QPushButton" name="follow_start_btn">
+       <widget class="QPushButton" name="follow_marker_btn">
         <property name="minimumSize">
          <size>
           <width>0</width>
-          <height>80</height>
+          <height>60</height>
          </size>
         </property>
         <property name="font">
@@ -126,30 +126,6 @@
         </property>
         <property name="text">
          <string>FOLLOW MARKER</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QPushButton" name="follow_stop_btn">
-        <property name="minimumSize">
-         <size>
-          <width>0</width>
-          <height>80</height>
-         </size>
-        </property>
-        <property name="font">
-         <font>
-          <pointsize>18</pointsize>
-          <weight>75</weight>
-          <italic>true</italic>
-          <bold>true</bold>
-         </font>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">color:#FF4D00</string>
-        </property>
-        <property name="text">
-         <string>STOP</string>
         </property>
        </widget>
       </item>
@@ -173,6 +149,51 @@
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <widget class="QPushButton" name="follow_stop_btn">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>60</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>18</pointsize>
+          <weight>75</weight>
+          <italic>true</italic>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">color:#FF4D00</string>
+        </property>
+        <property name="text">
+         <string>STOP</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QPushButton" name="follow_interact_btn">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>60</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>18</pointsize>
+          <weight>75</weight>
+          <italic>true</italic>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>FOLLOW INTERACT</string>
         </property>
        </widget>
       </item>
