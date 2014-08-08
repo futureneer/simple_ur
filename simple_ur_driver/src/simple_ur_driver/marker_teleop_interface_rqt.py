@@ -36,7 +36,7 @@ class URMarkerTeleopPanel(Plugin):
         # Add widget to the user interface
         context.add_widget(self._widget)
 
-        self.driver_status_sub = rospy.Subscriber('/ur_robot/driver_status',String,self.driver_status_cb)
+        self.driver_status_sub = rospy.Subscriber('/ur_robot/driver_status',String, self.driver_status_cb)
         self.target_pub = rospy.Publisher('/ur_robot/follow_goal',PoseStamped)
 
         # Parameters
@@ -58,10 +58,12 @@ class URMarkerTeleopPanel(Plugin):
 
     def follow_stop(self):
         self.follow = False
+        rospy.logwarn('FOLLOWING STOPPED')
 
     def follow_start(self):
         if self.driver_status == 'FOLLOW':
             self.follow = True
+            rospy.logwarn('FOLLOWING MARKER')
         else:
             rospy.logwarn('The Driver is not in follow mode')
 
@@ -80,10 +82,12 @@ class URMarkerTeleopPanel(Plugin):
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
                 rospy.logwarn(str(e))
 
-    def status_cb(self,msg):
+    def driver_status_cb(self,msg):
         self.driver_status = msg.data
         if not self.driver_status == 'FOLLOW':
-            self.follow = False
+            if self.follow == True:
+                rospy.logwarn('The Driver left follow mode, follow disabled')
+                self.follow_stop()
 
     def servo_to_pose(self):
         try:

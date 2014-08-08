@@ -55,16 +55,16 @@ class URDriver():
             self.robot_state = 'POWER OFF'
         else:
             rospy.logwarn('SIMPLE UR - ROBOT CONNECTED SUCCESSFULLY')
-            self.rtm = self.rob.get_realtime_monitor()
-            rospy.logwarn('SIMPLE UR - GOT REAL TIME <READ> INTERFACE TO ROBOT')
-            self.rt_socket = socket.create_connection(('192.168.1.155', 30003), timeout=0.5)
             rospy.logwarn('SIMPLE UR - GOT REAL TIME <WRITE> INTERFACE TO ROBOT')        
+            self.rt_socket = socket.create_connection(('192.168.1.155', 30003), timeout=0.5)
+            rospy.logwarn('SIMPLE UR - GOT REAL TIME <READ> INTERFACE TO ROBOT')
+            self.rtm = self.rob.get_realtime_monitor()
             self.driver_status = 'IDLE'
 
         ### Set Up PID ###
         self.P = 1.0
         self.I = 0.0
-        self.D = 0.1
+        self.D = 0.0
         self._pid = []
         self.follow_accel = .1
         self.follow_timeout = .01
@@ -83,6 +83,13 @@ class URDriver():
             self.publish_status()
             if self.driver_status == 'FOLLOW':
                 self.update_follow()
+
+            # Get updated robot RT data
+            D = self.rtm.get_all_data(wait=False)['tcp']
+            # rospy.loginfo('Current: <'+str(D)+'>')
+            if D != None:
+                self.current_axis_angle = D
+
             # Sleep between commands to robot
             rospy.sleep(self.follow_sleep)
 
@@ -96,6 +103,7 @@ class URDriver():
         rospy.logwarn('SIMPLE UR - Real Time <WRITE> Socket Closed')
 
     def reset_follow_goal(self):
+        rospy.logwarn('RESET FOLLOW GOAL')
         self.follow_goal_axis_angle = self.current_axis_angle = self.rtm.get_all_data(wait=False)['tcp']
         
     def update(self):
@@ -127,13 +135,8 @@ class URDriver():
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
     def update_follow(self):
+
         if not self.follow_goal_reached:
-            # Get current pose as axis-angle
-            self.current_axis_angle = self.rtm.get_all_data(wait=False)['tcp']
-            # DEBUG Print current and goal positions
-            rospy.loginfo('Current: <'+str(self.current_axis_angle)+'>')
-            rospy.loginfo('Goal: <'+str(self.follow_goal_axis_angle)+'>')
-            #
             vel_cmd = []
             # append a velocity update for each parameter to command velocities
             with self.pid_lock:
@@ -143,24 +146,32 @@ class URDriver():
             for v, i in zip(vel_cmd, range(6)):
                 if v > 0:
                     if v > self.MAX_VEL:
-                        vel_command[i] = self.MAX_VEL
+                        vel_cmd[i] = self.MAX_VEL
                 else:
                     if v < -self.MAX_VEL:
-                        vel_command[i] = -self.MAX_VEL
+                        vel_cmd[i] = -self.MAX_VEL
             # Append other parameters to vel command
             vel_cmd.append(self.follow_accel)
             vel_cmd.append(self.follow_timeout)
             # Create and clean up program
-            prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vel_command)
+            prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vel_cmd)
+            # rospy.logwarn(prog)
             if type(prog) != bytes:
                 prog = prog.encode()
             # Send command to socket
-            # self.rt_socket.send() 
+            self.rt_socket.send(prog)
+        # DEBUG    
+        # else:
+        #     pass
+            # rospy.loginfo('Goal: <'+str(self.follow_goal_axis_angle)+'>')
+        # DEBUG
+
         
         # Check to see if follow goal is reached
         if self.reached_goal(self.follow_goal_axis_angle, self.current_axis_angle, .001):
-            rospy.logwarn('SIMPLE UR - Follow Goal Reached')
-            self.follow_goal_reached = True
+            if self.follow_goal_reached == False:
+                rospy.logwarn('SIMPLE UR - Follow Goal Reached')
+                self.follow_goal_reached = True
         else:
             self.follow_goal_reached = False
 
@@ -170,6 +181,8 @@ class URDriver():
             F_goal = tf_c.fromMsg(msg.pose)
             a,axis = F_goal.M.GetRotAngle()
             self.follow_goal_axis_angle = list(F_goal.p) + [a*axis[0],a*axis[1],a*axis[2]]
+            # Broadcast goal for debugging purposes
+            self.broadcaster_.sendTransform(tuple(F_goal.p),tuple(F_goal.M.GetQuaternion()),rospy.Time.now(), '/ur_goal','/base_link')
             # Set goal pose as PID set point
             with self.pid_lock:
                 for pid, g in zip(self._pid, self.follow_goal_axis_angle):
@@ -183,7 +196,7 @@ class URDriver():
         v1 = np.array(a)
         v2 = np.array(b)
         res = np.sum(np.abs(np.subtract(v1,v2)))
-        # print res
+        # rospy.logwarn('DISTANCE = ['+str(res)+']')
         if res < val:
             return True
         else:

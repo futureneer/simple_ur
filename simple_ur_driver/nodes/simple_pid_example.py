@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     P = 1.0
     I = 0.0
-    D = 0.1
+    D = 0.5
 
     pids = []
     for i in range(6):
@@ -144,7 +144,10 @@ if __name__ == "__main__":
 
     ### Create Command Pose
     command_pose = list(start_pose)
-    command_pose[2] = command_pose[2] + .2
+    command_pose[2] = command_pose[2] - .2 # Move [.1 meters] in Z axis
+    # command_pose[3] = command_pose[3] - .3 # Move [.3 radians ] in pitch
+    # command_pose[5] = command_pose[5] - .3 # Move [.3 radians ] in pitch
+    # command_pose[4] = command_pose[4] - .3 # Move [.3 radians ] in pitch
 
     for p, i in zip(pids, range(6)):
         p.setPoint(command_pose[i])
@@ -160,7 +163,7 @@ if __name__ == "__main__":
     while not check_distance(command_pose,current_pose,.001):
         # Get current values
         current_pose = realtime_monitor.get_all_data(wait=False)['tcp']
-        # print current_pose
+        print current_pose
         vel_command = []
         for p, i in zip(pids, range(6)):
             up = p.update(current_pose[i])
@@ -197,6 +200,9 @@ if __name__ == "__main__":
         rospy.sleep(.005)
 
     rob.cleanup()
+    print 'robot cleaned up'
+    sock.close()
+    print 'rt socket closed'
 
 
 
