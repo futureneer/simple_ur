@@ -39,7 +39,7 @@ class URDriver():
   Socket_Closed=True
   while (True):
     if (Socket_Closed == True):
-      socket_open("192.168.1.101", 30000)
+      socket_open("192.168.1.5", 30000)
       global Socket_Closed = False 
     end
 
@@ -207,7 +207,7 @@ pidProg()
 
     def start_follow(self):
         print 'Setting up follow mode'
-        self.follow_host = "192.168.1.101"      # The remote host
+        self.follow_host = "192.168.1.5"      # The remote host
         self.follow_port = 30000                # The same port as used by the server
         print 'Sending follow program'
         self.rob.send_program(self.PID_PROG,direct=True)
@@ -218,15 +218,19 @@ pidProg()
             self.follow_socket.bind((self.follow_host, self.follow_port))
             self.follow_socket.listen(5)
             self.follow_handle, addr = self.follow_socket.accept()
+            rospy.sleep(.25)
             self.follow_handle.send("(4)")
         except socket.error, msg:
             print msg
 
     def stop_follow(self):
-        self.follow_handle.send("(3)")
-        rospy.sleep(.01)
-        self.follow_handle.close()
-        self.follow_socket.close()
+        if self.follow_handle != None:
+            self.follow_handle.send("(3)")
+            rospy.sleep(.01)
+            self.follow_handle.close()
+            self.follow_socket.close()
+        else:
+            rospy.logwarn("Handle Not Found")
 
     def follow_goal_cb(self,msg):
         if self.driver_status == 'FOLLOW':
@@ -291,6 +295,7 @@ pidProg()
                 self.driver_status = 'SERVO'
                 return 'SUCCESS - servo mode enabled'
             elif req.mode == 'FOLLOW':
+                rospy.logwarn('requested follow mode')
                 self.driver_status = 'FOLLOW'
                 self.start_follow()
                 self.reset_follow_goal()
