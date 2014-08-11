@@ -1,0 +1,102 @@
+def pidProg():
+  MSG_QUIT = 2
+  MSG_TEST = 3
+  MSG_SETPOINT = 4
+  MULT_jointstate = 10000.0
+  MULT_time = 1000000.0
+  MULT_blend = 1000.0
+  pi = 3.14159265359
+
+  textmsg('PID Program Starting')
+
+  ### PID Variables
+  Kp = [10.0,10.0,10.0,20.0,20.0,20.0]
+  Ki = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Kd = [0.0,0.0,0.0,0.0,0.0,0.0]
+  P_value = [0,0,0,0,0,0]
+  I_value = [0,0,0,0,0,0]
+  D_value = [0,0,0,0,0,0]
+
+  Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Integrator_max = 500
+  Integrator_min = -500
+  set_point = [0.0,0.0,0.0,0.0,0.0,0.0]
+  error = [0.0,0.0,0.0,0.0,0.0,0.0]
+
+  def update_pid(v):
+    error[v] = set_point[v] * error[v] 
+    P_value[v] = Kp[v] * error[v]
+    D_value[v] = Kd[v] * ( error[v] - Derivator[v])
+    Derivator[v] = error[v]
+
+    Integrator[v] = Integrator[v] + error[v]
+
+    if Integrator[v] > Integrator_max:
+      Integrator[v] = Integrator_max
+    end
+    if Integrator[v] < Integrator_min:
+      Integrator[v] = Integrator_min
+    end
+    
+    I_value[v] = Integrator[v] * Ki[v]
+
+    PID_update = P_value[v] + I_value[v] + D_value[v]
+
+    return PID_update
+  end
+
+  def set_pid_setpoint(setpoint):
+    set_point = setpoint
+    Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
+    Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  end
+
+  socket_open(HOSTNAME, 30003)
+  textmsg("Robot Communicating Properly over Realtime PORT 30003")
+
+  # MAIN LOOP
+  while True:
+    packet = socket_read_binary_integer(1)
+
+    if packet[0] == 0:
+      textmsg("Received nothing")
+    elif packet[0] > 1:
+      textmsg("Received too many things")
+    else:
+      mtype = packet[1]
+
+      if mtype == MSG_QUIT:
+        textmsg("Received QUIT")
+        break
+
+      if mtype == MSG_TEST:
+        textmsg("Received TEST MESSAGE")
+
+      elif mtype == MSG_SETPOINT:
+        textmsg("Received setpoint")
+        params_mult = socket_read_binary_integer(6)
+        if params_mult[0] == 0:
+          textmsg("Received no parameters recieved")
+        end
+        # Unpacks the parameters
+        setp = [params_mult[1] / MULT_jointstate,
+                   params_mult[2] / MULT_jointstate,
+                   params_mult[3] / MULT_jointstate,
+                   params_mult[4] / MULT_jointstate,
+                   params_mult[5] / MULT_jointstate,
+                   params_mult[6] / MULT_jointstate]
+        # Sends the command
+        textmsg("Recieved Setpoint:")
+        textmsg(setp)
+      else:
+        textmsg("Received unknown message type")
+      end
+    end
+  end
+
+
+end
+
+
+pidProg()

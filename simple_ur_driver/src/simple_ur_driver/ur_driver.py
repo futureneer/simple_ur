@@ -81,15 +81,55 @@ class URDriver():
         rospy.logwarn('Loading PID program')
         with open(roslib.packages.get_pkg_dir('simple_ur_driver') + '/prog/prog_pid') as fin:
             self.pid_prog = fin.read() % {"driver_hostname": '192.168.1.155'}
-
+        with open(roslib.packages.get_pkg_dir('simple_ur_driver') + '/prog/prog_test') as fin:
+            self.pid_test = fin.read()
         rospy.logwarn('Sending PID program to robot')
-        self.rob.send_program(self.pid_prog)
+        # self.rob.send_program(self.pid_test,direct=True)
+        # self.rob.send_program('textmsg("test")',direct=True)
+        test='''def pidProg():  
+  textmsg("*** Test Program Starting ***")
+  MSG_QUIT = 2
+  MSG_TEST = 3
+  MSG_SETPOINT = 4
+  MULT_jointstate = 10000.0
+  MULT_time = 1000000.0
+  MULT_blend = 1000.0
+  pi = 3.14159265359
+  
+  textmsg("Opening RT Socket")
+  socket_open("192.168.1.155", 30003)
+  textmsg("Robot Communicating Properly over Realtime PORT 30003")
 
+  # MAIN LOOP
+  while True:
+    packet = socket_read_binary_integer(1)
+    if packet[0] == 0:
+      textmsg("Received nothing")
+    elif packet[0] > 1:
+      textmsg("Received too many things")
+    else:
+      textmsg(packet)
+      mtype = packet[1]
+      if mtype == MSG_QUIT:
+        textmsg("Received QUIT")
+        break
+      end
+    end
+    sleep(.001)
+  end
+end
+pidProg()'''
+        # print test
+        # self.rob.send_program(test,direct=True)
+        self.rob.send_program(test,direct=True)
         rospy.logwarn('Sending Test message to program')
-        self.rt_socket.send(struct.pack("!i", MSG_QUIT))
-
+        # msg = struct.pack("!i", self.MSG_QUIT)
+        # print msg
         ### START LOOP ###
         while not rospy.is_shutdown():
+            msg = struct.pack("!i", 10000)
+            self.rt_socket.send(msg)
+
             self.update()
             self.check_driver_status()
             self.check_robot_state()
