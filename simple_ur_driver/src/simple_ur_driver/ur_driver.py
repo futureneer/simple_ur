@@ -24,8 +24,9 @@ class URDriver():
     MAX_VEL = 1.8
     JOINT_NAMES = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
                'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
-    MSG_QUIT = 0
-    MSG_MOVEL=1
+    MSG_QUIT = 2
+    MSG_TEST = 3
+    MSG_SETPOINT = 4
     MULT_jointstate = 10000.0
     MULT_time = 1000000.0
     MULT_blend = 1000.0
@@ -69,12 +70,23 @@ class URDriver():
         self.follow_accel = .1
         self.follow_timeout = .008
         # self.follow_sleep = .008
-        self.follow_rate = rospy.Rate(125)
+        self.follow_rate = rospy.Rate(100)
         self.follow_goal_reached = True
         self.pid_lock = threading.Lock()
         self.reset_follow_goal()
         for i in range(6):
             self._pid.append(PID(self.P,self.I,self.D))
+
+        # Send PID Driver Program
+        rospy.logwarn('Loading PID program')
+        with open(roslib.packages.get_pkg_dir('simple_ur_driver') + '/prog/prog_pid') as fin:
+            self.pid_prog = fin.read() % {"driver_hostname": '192.168.1.155'}
+
+        rospy.logwarn('Sending PID program to robot')
+        self.rob.send_program(self.pid_prog)
+
+        rospy.logwarn('Sending Test message to program')
+        self.rt_socket.send(struct.pack("!i", MSG_QUIT))
 
         ### START LOOP ###
         while not rospy.is_shutdown():
@@ -82,14 +94,14 @@ class URDriver():
             self.check_driver_status()
             self.check_robot_state()
             self.publish_status()
-            if self.driver_status == 'FOLLOW':
-                self.update_follow()
+            # if self.driver_status == 'FOLLOW':
+                # self.update_follow()
 
             # Get updated robot RT data
-            D = self.rtm.get_all_data(wait=False)['tcp']
+            # D = self.rtm.get_all_data(wait=False)['tcp']
             # rospy.loginfo('Current: <'+str(D)+'>')
-            if D != None:
-                self.current_axis_angle = D
+            # if D != None:
+                # self.current_axis_angle = D
 
             # Sleep between commands to robot
             # rospy.sleep(self.follow_sleep)
