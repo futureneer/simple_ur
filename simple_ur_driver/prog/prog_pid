@@ -1,0 +1,190 @@
+def pidProg():
+  HOSTNAME = "%(driver_hostname)s"
+  MSG_OUT = 1
+  MSG_QUIT = 2
+  MSG_JOINT_STATES = 3
+  MSG_MOVEJ = 4
+  MSG_WAYPOINT_FINISHED = 5
+  MSG_STOPJ = 6
+  MSG_SERVOJ = 7
+  MSG_MOVEL = 8
+  MSG_TCP_STATE = 9
+  MSG_SERVOC = 10
+  MSG_FREEDRIVE = 11
+  VAL_TRUE = 1
+  VAL_FALSE = 0
+  MULT_jointstate = 10000.0
+  MULT_time = 1000000.0
+  MULT_blend = 1000.0
+  pi = 3.14159265359
+
+
+  ### PID Variables
+  Kp = [10.0,10.0,10.0,20.0,20.0,20.0]
+  Ki = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Kd = [0.0,0.0,0.0,0.0,0.0,0.0]
+  P_value = [0,0,0,0,0,0]
+  I_value = [0,0,0,0,0,0]
+  D_value = [0,0,0,0,0,0]
+
+  Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Integrator_max = 500
+  Integrator_min = -500
+  set_point = [0.0,0.0,0.0,0.0,0.0,0.0]
+  error = [0.0,0.0,0.0,0.0,0.0,0.0]
+
+  def update_pid(v):
+    error[v] = set_point[v] * error[v] 
+    P_value[v] = Kp[v] * error[v]
+    D_value[v] = Kd[v] * ( error[v] - Derivator[v])
+    Derivator[v] = error[v]
+
+    Integrator[v] = Integrator[v] + error[v]
+
+    if Integrator[v] > Integrator_max:
+      Integrator[v] = Integrator_max
+    end
+    if Integrator[v] < Integrator_min:
+      Integrator[v] = Integrator_min
+    end
+    
+    I_value[v] = Integrator[v] * Ki[v]
+
+    PID_update = P_value[v] + I_value[v] + D_value[v]
+
+    return PID_update
+  end
+
+  def set_pid_setpoint(setpoint):
+    set_point = setpoint
+    Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
+    Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  end
+
+  socket_open(HOSTNAME, 30003)
+  textmsg("Robot Communicating Properly over Realtime PORT 30003")
+
+  # MAIN LOOP
+  while True:
+    packet = socket_read_binary_integer(1)
+
+    if packet[0] == 0:
+      textmsg("Received nothing")
+    elif packet[0] > 1:
+      textmsg("Received too many things")
+    else:
+      mtype = packet[1]
+
+      if mtype == MSG_QUIT:
+        textmsg("Received QUIT")
+        break
+
+      elif mtype == MSG_SETPOINT:
+        textmsg("Received setpoint")
+        params_mult = socket_read_binary_integer(1+6+4)
+        if params_mult[0] == 0:
+          textmsg("Received no parameters recieved")
+        end
+        # Unpacks the parameters
+        waypoint_id = params_mult[1]
+        q = [params_mult[2] / MULT_jointstate,
+                   params_mult[3] / MULT_jointstate,
+                   params_mult[4] / MULT_jointstate,
+                   params_mult[5] / MULT_jointstate,
+                   params_mult[6] / MULT_jointstate,
+                   params_mult[7] / MULT_jointstate]
+        a = params_mult[8] / MULT_jointstate
+        v = params_mult[9] / MULT_jointstate
+        t = params_mult[10] / MULT_time
+        r = params_mult[11] / MULT_blend
+        # Sends the command
+        textmsg("movej started")
+        movej(q, a, v, t, r)
+        send_waypoint_finished(waypoint_id)
+        textmsg("movej finished")
+
+      elif mtype == MSG_SERVOJ:
+        # Reads the parameters
+        params_mult = socket_read_binary_integer(1+6+1)
+        if params_mult[0] == 0:
+          textmsg("Received no parameters for movej message")
+        end
+        # Unpacks the parameters
+              waypoint_id = params_mult[1]
+        q = [params_mult[2] / MULT_jointstate,
+                   params_mult[3] / MULT_jointstate,
+                   params_mult[4] / MULT_jointstate,
+                   params_mult[5] / MULT_jointstate,
+                   params_mult[6] / MULT_jointstate,
+                   params_mult[7] / MULT_jointstate]
+        t = params_mult[8] / MULT_time
+        # Servos
+        #servoj(q, 3, 0.1, t)
+        #send_waypoint_finished(waypoint_id)
+        # set_servo_setpoint(waypoint_id, q, t)
+
+      elif mtype == MSG_MOVEL:
+        textmsg("Received movel")
+        params_mult = socket_read_binary_integer(1+6+2)
+        if params_mult[0] == 0:
+          textmsg("Received no parameters for movel message")
+        end
+        # Unpacks the parameters
+        waypoint_id = params_mult[1]
+        pose = [params_mult[2] / MULT_jointstate,
+                   params_mult[3] / MULT_jointstate,
+                   params_mult[4] / MULT_jointstate,
+                   params_mult[5] / MULT_jointstate,
+                   params_mult[6] / MULT_jointstate,
+                   params_mult[7] / MULT_jointstate]
+        acc = params_mult[8] / MULT_jointstate
+        vel = params_mult[9] / MULT_jointstate
+        # Sends the command
+        textmsg("movel started")
+        # textmsg(pose)
+        # textmsg(acc)
+        # textmsg(vel)
+        movel(p[pose[0],pose[1],pose[2],pose[3],pose[4],pose[5]], a=acc, v=vel, t=0, r=0)
+        send_waypoint_finished(waypoint_id)
+        textmsg("movel finished")
+
+      elif mtype == MSG_SERVOC:
+        textmsg("Received servoc")
+        params_mult = socket_read_binary_integer(1+6+2)
+        if params_mult[0] == 0:
+          textmsg("Received no parameters for servoc message")
+        end
+        # Unpacks the parameters
+        waypoint_id = params_mult[1]
+        pose = [params_mult[2] / MULT_jointstate,
+                   params_mult[3] / MULT_jointstate,
+                   params_mult[4] / MULT_jointstate,
+                   params_mult[5] / MULT_jointstate,
+                   params_mult[6] / MULT_jointstate,
+                   params_mult[7] / MULT_jointstate]
+        acc = params_mult[8] / MULT_jointstate
+        vel = params_mult[9] / MULT_jointstate
+        # Sends the command
+        textmsg("servoc started")
+        # textmsg(pose)
+        # textmsg(acc)
+        # textmsg(vel)
+        servoc(p[pose[0],pose[1],pose[2],pose[3],pose[4],pose[5]], a=acc, v=vel, r=0)
+        send_waypoint_finished(waypoint_id)
+        textmsg("servoc finished")
+
+      elif mtype == MSG_STOPJ:
+        textmsg("Received stopj")
+        stopj(1.0)
+      else:
+        textmsg("Received unknown message type")
+      end
+    end
+  end
+
+
+end
+
+
+pidProg()
