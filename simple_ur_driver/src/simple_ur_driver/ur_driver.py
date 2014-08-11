@@ -30,6 +30,39 @@ class URDriver():
     MULT_jointstate = 10000.0
     MULT_time = 1000000.0
     MULT_blend = 1000.0
+    
+    PID_PROG = '''def pidProg():
+  textmsg("PID Follow Program Started")
+  MSG_QUIT = 3
+  MSG_TEST = 4
+  MSG_SETPOINT = 5
+  Socket_Closed=True
+  while (True):
+    if (Socket_Closed == True):
+      socket_open("192.168.1.101", 30000)
+      global Socket_Closed = False 
+    end
+
+    data = socket_read_ascii_float(6)
+    if data[0] == 1:
+      textmsg("Got Command")
+      if data[1] == MSG_QUIT:
+        textmsg("Recieved Quit Command ... DONE")
+        break
+      elif data[1] == MSG_TEST:
+        textmsg("Recieved Test Message")
+      end
+    elif data[0] == 6:
+      textmsg(data)
+    else:
+      textmsg("Got a Bad Packet")  
+    end
+
+    sleep(.008)
+  end
+end
+pidProg()
+'''
 
     def __init__(self):
         rospy.init_node('ur_driver',anonymous=True)
@@ -47,6 +80,8 @@ class URDriver():
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
+        # Rate
+        self.run_rate = rospy.Rate(100)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
@@ -63,68 +98,10 @@ class URDriver():
             self.driver_status = 'IDLE'
 
         ### Set Up PID ###
-        self.P = 20.0
-        self.I = 0.0
-        self.D = 0.0
-        self._pid = []
-        self.follow_accel = .1
-        self.follow_timeout = .008
-        # self.follow_sleep = .008
-        self.follow_rate = rospy.Rate(100)
         self.follow_goal_reached = True
         self.pid_lock = threading.Lock()
         self.reset_follow_goal()
-        for i in range(6):
-            self._pid.append(PID(self.P,self.I,self.D))
 
-        # Send PID Driver Program
-        rospy.logwarn('Loading PID program')
-        with open(roslib.packages.get_pkg_dir('simple_ur_driver') + '/prog/prog_pid') as fin:
-            self.pid_prog = fin.read() % {"driver_hostname": '192.168.1.155'}
-        with open(roslib.packages.get_pkg_dir('simple_ur_driver') + '/prog/prog_test') as fin:
-            self.pid_test = fin.read()
-        rospy.logwarn('Sending PID program to robot')
-        # self.rob.send_program(self.pid_test,direct=True)
-        # self.rob.send_program('textmsg("test")',direct=True)
-        test='''def pidProg():  
-  textmsg("*** Test Program Starting ***")
-  MSG_QUIT = 2
-  MSG_TEST = 3
-  MSG_SETPOINT = 4
-  MULT_jointstate = 10000.0
-  MULT_time = 1000000.0
-  MULT_blend = 1000.0
-  pi = 3.14159265359
-  
-  textmsg("Opening RT Socket")
-  socket_open("192.168.1.155", 30003)
-  textmsg("Robot Communicating Properly over Realtime PORT 30003")
-
-  # MAIN LOOP
-  while True:
-    packet = socket_read_binary_integer(1)
-    if packet[0] == 0:
-      textmsg("Received nothing")
-    elif packet[0] > 1:
-      textmsg("Received too many things")
-    else:
-      textmsg(packet)
-      mtype = packet[1]
-      if mtype == MSG_QUIT:
-        textmsg("Received QUIT")
-        break
-      end
-    end
-    sleep(.001)
-  end
-end
-pidProg()'''
-        # print test
-        # self.rob.send_program(test,direct=True)
-        self.rob.send_program(test,direct=True)
-        rospy.logwarn('Sending Test message to program')
-        # msg = struct.pack("!i", self.MSG_QUIT)
-        # print msg
         ### START LOOP ###
         while not rospy.is_shutdown():
             msg = struct.pack("!i", 10000)
@@ -134,18 +111,10 @@ pidProg()'''
             self.check_driver_status()
             self.check_robot_state()
             self.publish_status()
-            # if self.driver_status == 'FOLLOW':
-                # self.update_follow()
-
-            # Get updated robot RT data
-            # D = self.rtm.get_all_data(wait=False)['tcp']
-            # rospy.loginfo('Current: <'+str(D)+'>')
-            # if D != None:
-                # self.current_axis_angle = D
-
+            if self.driver_status == 'FOLLOW':
+                self.update_follow()
             # Sleep between commands to robot
-            # rospy.sleep(self.follow_sleep)
-            self.follow_rate.sleep()
+            self.run_rate.sleep()
 
         # Finish
         rospy.logwarn('SIMPLE UR - ROBOT INTERFACE CLOSING')
@@ -189,52 +158,75 @@ pidProg()'''
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
     def update_follow(self):
-
-        if not self.follow_goal_reached:
-            vel_cmd = []
-            # append a velocity update for each parameter to command velocities
-            with self.pid_lock:
-                for pid, p in zip(self._pid, self.current_axis_angle):
-                    vel_cmd.append(pid.update(p))
-            # Check velocities against limits
-            for v, i in zip(vel_cmd, range(6)):
-                if v > 0:
-                    if v > self.MAX_VEL:
-                        vel_cmd[i] = self.MAX_VEL
-                else:
-                    if v < -self.MAX_VEL:
-                        vel_cmd[i] = -self.MAX_VEL
-            # Scale Acceleration
-            vel_avg = abs(sum(vel_cmd)/6.0)
-            acc_scale = (vel_avg/self.MAX_VEL)
-            scaled_accel = self.MAX_ACC*acc_scale
-            # clamp lower accel limit
-            if scaled_accel < .05: scaled_accel = .05
-            # Append other parameters to vel command
-            vel_cmd.append(scaled_accel)
-            # print 'acc: '+str(scaled_accel)+' avg vel: '+str(vel_avg)
-            vel_cmd.append(self.follow_timeout)
-            # Create and clean up program
-            prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vel_cmd)
-            # rospy.logwarn(prog)
-            if type(prog) != bytes:
-                prog = prog.encode()
-            # Send command to socket
-            self.rt_socket.send(prog)
-        # DEBUG    
-        # else:
-        #     pass
-            # rospy.loginfo('Goal: <'+str(self.follow_goal_axis_angle)+'>')
-        # DEBUG
+        pass
+        # if not self.follow_goal_reached:
+        #     vel_cmd = []
+        #     # append a velocity update for each parameter to command velocities
+        #     with self.pid_lock:
+        #         for pid, p in zip(self._pid, self.current_axis_angle):
+        #             vel_cmd.append(pid.update(p))
+        #     # Check velocities against limits
+        #     for v, i in zip(vel_cmd, range(6)):
+        #         if v > 0:
+        #             if v > self.MAX_VEL:
+        #                 vel_cmd[i] = self.MAX_VEL
+        #         else:
+        #             if v < -self.MAX_VEL:
+        #                 vel_cmd[i] = -self.MAX_VEL
+        #     # Scale Acceleration
+        #     vel_avg = abs(sum(vel_cmd)/6.0)
+        #     acc_scale = (vel_avg/self.MAX_VEL)
+        #     scaled_accel = self.MAX_ACC*acc_scale
+        #     # clamp lower accel limit
+        #     if scaled_accel < .05: scaled_accel = .05
+        #     # Append other parameters to vel command
+        #     vel_cmd.append(scaled_accel)
+        #     # print 'acc: '+str(scaled_accel)+' avg vel: '+str(vel_avg)
+        #     vel_cmd.append(self.follow_timeout)
+        #     # Create and clean up program
+        #     prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vel_cmd)
+        #     # rospy.logwarn(prog)
+        #     if type(prog) != bytes:
+        #         prog = prog.encode()
+        #     # Send command to socket
+        #     self.rt_socket.send(prog)
+        # # DEBUG    
+        # # else:
+        # #     pass
+        #     # rospy.loginfo('Goal: <'+str(self.follow_goal_axis_angle)+'>')
+        # # DEBUG
 
         
-        # Check to see if follow goal is reached
-        if self.reached_goal(self.follow_goal_axis_angle, self.current_axis_angle, .001):
-            if self.follow_goal_reached == False:
-                rospy.logwarn('SIMPLE UR - Follow Goal Reached')
-                self.follow_goal_reached = True
-        else:
-            self.follow_goal_reached = False
+        # # Check to see if follow goal is reached
+        # if self.reached_goal(self.follow_goal_axis_angle, self.current_axis_angle, .001):
+        #     if self.follow_goal_reached == False:
+        #         rospy.logwarn('SIMPLE UR - Follow Goal Reached')
+        #         self.follow_goal_reached = True
+        # else:
+        #     self.follow_goal_reached = False
+
+    def start_follow(self):
+        print 'Setting up follow mode'
+        self.follow_host = "192.168.1.101"      # The remote host
+        self.follow_port = 30000                # The same port as used by the server
+        print 'Sending follow program'
+        self.rob.send_program(self.PID_PROG,direct=True)
+        print 'Creating follow socket'
+        try:
+            self.follow_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+            self.follow_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.follow_socket.bind((self.follow_host, self.follow_port))
+            self.follow_socket.listen(5)
+            self.follow_handle, addr = self.follow_socket.accept()
+            self.follow_handle.send("(4)")
+        except socket.error, msg:
+            print msg
+
+    def stop_follow(self):
+        self.follow_handle.send("(3)")
+        rospy.sleep(.01)
+        self.follow_handle.close()
+        self.follow_socket.close()
 
     def follow_goal_cb(self,msg):
         if self.driver_status == 'FOLLOW':
@@ -300,11 +292,14 @@ pidProg()'''
                 return 'SUCCESS - servo mode enabled'
             elif req.mode == 'FOLLOW':
                 self.driver_status = 'FOLLOW'
+                self.start_follow()
                 self.reset_follow_goal()
                 return 'SUCCESS - follow mode enabled'
             elif req.mode == 'DISABLE':
+                if self.driver_status == 'FOLLOW':
+                    self.stop_follow()
+                    self.reset_follow_goal()
                 self.driver_status = 'IDLE'
-                self.reset_follow_goal()
                 return 'SUCCESS - servo mode disabled'
 
     def set_stop_call(self,req):

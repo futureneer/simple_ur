@@ -14,7 +14,7 @@ if __name__ == "__main__":
     print 'created socket'
     rospy.sleep(1)
 
-    prog='''def pidProg():  
+    prog='''def testProg():  
   textmsg("*** Test Program Starting ***")
   MSG_TEST = 3
   textmsg("Opening RT Socket")
@@ -29,7 +29,9 @@ if __name__ == "__main__":
     elif packet[0] > 1:
       textmsg("Received too many things")
     else:
+      # PRINT OUT THE RECIEVED PACKET
       textmsg(packet)
+      ###
       mtype = packet[1]
       if mtype == MSG_TEST:
         textmsg("Received Test Message")
@@ -39,7 +41,7 @@ if __name__ == "__main__":
     sleep(.008)
   end
 end
-pidProg()'''
+testProg()'''
 
     prog.strip()
     print "Sending program: " + prog
