@@ -36,7 +36,36 @@ class URDriver():
   MSG_QUIT = 3
   MSG_TEST = 4
   MSG_SETPOINT = 5
-  Socket_Closed=True
+  Socket_Closed = True
+
+  ## PID ##
+  Kp = [10.0,10.0,10.0,20.0,20.0,20.0]
+  Ki = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Kd = [0.0,0.0,0.0,0.0,0.0,0.0]
+  P_value = [0,0,0,0,0,0]
+  I_value = [0,0,0,0,0,0]
+  D_value = [0,0,0,0,0,0]
+
+  Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Integrator_max = 500
+  Integrator_min = -500
+  set_point = [0.0,0.0,0.0,0.0,0.0,0.0]
+  error = [0.0,0.0,0.0,0.0,0.0,0.0]
+
+  def set_pid_setpoint(data):
+    point = 0
+    while point < data[0]:
+      set_point[point] = data[point+1]
+      point = point + 1
+    end
+    Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
+    Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
+  end
+
+  ## PID ##
+
+  ## MAIN LOOP
   while (True):
     if (Socket_Closed == True):
       socket_open("192.168.1.5", 30000)
@@ -54,8 +83,11 @@ class URDriver():
       end
     elif data[0] == 6:
       textmsg(data)
-    else:
-      textmsg("Got a Bad Packet")  
+      set_pid_setpoint(data)
+      textmsg(set_point)
+
+    # else:
+      # textmsg("Got a Bad Packet")  
     end
 
     sleep(.008)
@@ -81,7 +113,7 @@ pidProg()
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
         # Rate
-        self.run_rate = rospy.Rate(100)
+        self.run_rate = rospy.Rate(50)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
@@ -101,6 +133,8 @@ pidProg()
         self.follow_goal_reached = True
         self.pid_lock = threading.Lock()
         self.reset_follow_goal()
+        self.follow_socket = None
+        self.follow_sock_handle = None
 
         ### START LOOP ###
         while not rospy.is_shutdown():
@@ -158,6 +192,7 @@ pidProg()
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
     def update_follow(self):
+        self.follow_sock_handle.send("(0.1,0.2,0.3,0.41,3.14,0.01)")
         pass
         # if not self.follow_goal_reached:
         #     vel_cmd = []
@@ -206,28 +241,32 @@ pidProg()
         #     self.follow_goal_reached = False
 
     def start_follow(self):
-        print 'Setting up follow mode'
+        rospy.loginfo('Setting up follow mode')
         self.follow_host = "192.168.1.5"      # The remote host
         self.follow_port = 30000                # The same port as used by the server
-        print 'Sending follow program'
+        rospy.loginfo('Sending follow program')
         self.rob.send_program(self.PID_PROG,direct=True)
-        print 'Creating follow socket'
+        rospy.loginfo('Creating follow socket')
         try:
             self.follow_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
             self.follow_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.follow_socket.bind((self.follow_host, self.follow_port))
             self.follow_socket.listen(5)
-            self.follow_handle, addr = self.follow_socket.accept()
+            self.follow_sock_handle, addr = self.follow_socket.accept()
             rospy.sleep(.25)
-            self.follow_handle.send("(4)")
+            self.follow_sock_handle.send("(4)")
+            return True
         except socket.error, msg:
-            print msg
+            rospy.loginfo(msg)
+            return False
 
     def stop_follow(self):
-        if self.follow_handle != None:
-            self.follow_handle.send("(3)")
+        if self.follow_sock_handle != None:
+            rospy.loginfo('Sending Program Close Command')
+            self.follow_sock_handle.send("(3)")
             rospy.sleep(.01)
-            self.follow_handle.close()
+            rospy.loginfo('Cleaning Up Follow Sockets')
+            self.follow_sock_handle.close()
             self.follow_socket.close()
         else:
             rospy.logwarn("Handle Not Found")
@@ -296,10 +335,12 @@ pidProg()
                 return 'SUCCESS - servo mode enabled'
             elif req.mode == 'FOLLOW':
                 rospy.logwarn('requested follow mode')
-                self.driver_status = 'FOLLOW'
-                self.start_follow()
-                self.reset_follow_goal()
-                return 'SUCCESS - follow mode enabled'
+                if self.start_follow():
+                    self.driver_status = 'FOLLOW'
+                    self.reset_follow_goal()
+                    return 'SUCCESS - follow mode enabled'
+                else:
+                    return 'FAILED - Could not create follow socket'
             elif req.mode == 'DISABLE':
                 if self.driver_status == 'FOLLOW':
                     self.stop_follow()
