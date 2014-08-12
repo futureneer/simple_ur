@@ -41,7 +41,7 @@ class URDriver():
   ### PID VALUES ###
   Kp = [2.0,2.0,2.0,5.0,5.0,5.0]
   Ki = [0.0,0.0,0.0,0.0,0.0,0.0]
-  Kd = [0.1,0.1,0.1,.1,.1,.1]
+  Kd = [0.0,0.0,0.0,0.0,0.0,0.0]
   p_val = [0,0,0,0,0,0]
   i_val = [0,0,0,0,0,0]
   d_val = [0,0,0,0,0,0]
@@ -58,8 +58,8 @@ class URDriver():
   limit_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
   saved_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
   pid_error = [0.0,0.0,0.0,0.0,0.0,0.0]
-  max_vel = 1.5
-  max_dv = 2*.008
+  max_vel = .75
+  max_vel_diff = [0.024,0.024,0.024,0.024,0.024,0.024]
   D = 0
 
   # Limit the Velocities to max_vel
@@ -75,17 +75,21 @@ class URDriver():
         limit_vel[i] = -max_vel
       end
       i = i + 1
-    end
-    # Check acceleration
+    end    
+  end
+
+  def clamp_accelerations():
     i = 0
+    vel_diff = 0
     while i < 6:
-      dv = saved_vel[i] - limit_vel[i]
-      if dv > max_dv:
-        limit_vel[i] = saved_vel[i] + max_dv
-      end
-      if dv < -max_dv:
-        limit_vel[i] = saved_vel[i] - max_dv
-      end
+        vel_diff = saved_vel[i] - limit_vel[i]
+        if vel_diff > max_vel_diff[i]:
+          limit_vel[i] = saved_vel[i] - max_vel_diff[i]
+        end
+        if vel_diff < -max_vel_diff[i]:
+          limit_vel[i] = saved_vel[i] + max_vel_diff[i]
+        end
+        i = i + 1
     end
     # Update saved Velocities
     saved_vel = limit_vel
@@ -162,6 +166,11 @@ class URDriver():
           i = i + 1
         end
         clamp_velocities()
+        clamp_accelerations()
+        exit_critical
+      else:
+        enter_critical
+        limit_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
         exit_critical
       end
       sync()
@@ -170,12 +179,7 @@ class URDriver():
 
   thread move_thread():
     while True:
-      if D > .001:
-        textmsg(limit_vel)
-        speedl(limit_vel,1.0,.008)
-      else:
-        sync()
-      end
+      speedl(limit_vel,1.0,.007)
     end
   end
 
@@ -197,6 +201,7 @@ class URDriver():
         global Socket_Closed = False 
       else:
         textmsg("Socket Failed to Open")
+      end
     end
 
     data = socket_read_ascii_float(6)
@@ -209,9 +214,7 @@ class URDriver():
         textmsg("Recieved Test Message")
       end
     elif data[0] == 6:
-      # textmsg(data)
       set_pid_setpoint(data)
-      # textmsg(set_point)
 
     # else:
       # textmsg("Got a Bad Packet")  
@@ -244,7 +247,7 @@ pidProg()
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
         # Rate
-        self.run_rate = rospy.Rate(125)
+        self.run_rate = rospy.Rate(50)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
