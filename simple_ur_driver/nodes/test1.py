@@ -41,35 +41,35 @@ prog.strip()
 print "Sending program: " + prog
 if type(prog) != bytes:
     prog = prog.encode()
-sock.send(prog+b'\n')
+sock.send("speedl([.1,0,0,0,0,0],.1,1)\n")
 sock.close()
 
-print 'program loaded'
+# print 'program loaded'
 
-HOST = "192.168.1.101"      # The remote host
-PORT = 30000                # The same port as used by the server
+# HOST = "192.168.1.101"      # The remote host
+# PORT = 30000                # The same port as used by the server
 
-print "Starting Program"
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind((HOST, PORT))        # Bind to the port
-s.listen(5)                 # Now wait for client connection.
-c, addr = s.accept()        # Establish connection with client.
+# print "Starting Program"
+# s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
+# s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+# s.bind((HOST, PORT))        # Bind to the port
+# s.listen(5)                 # Now wait for client connection.
+# c, addr = s.accept()        # Establish connection with client.
    
-import rospy
+# import rospy
 
-i = 0
-while i < 10:
-    c.send("(0.1,0.4,0.4,0.01,3.14,0.01)");
-    time.sleep(.01)
-    i = i + 1
-c.send("(4)");
-time.sleep(.01)
-c.send("(6.0,7.0,8)");
-time.sleep(.01)
-c.send("(3)");
-time.sleep(.01)
-c.close()
-s.close()
-print "Program finish"
+# i = 0
+# while i < 10:
+#     c.send("(0.1,0.4,0.4,0.01,3.14,0.01)");
+#     time.sleep(.01)
+#     i = i + 1
+# c.send("(4)");
+# time.sleep(.01)
+# c.send("(6.0,7.0,8)");
+# time.sleep(.01)
+# c.send("(3)");
+# time.sleep(.01)
+# c.close()
+# s.close()
+# print "Program finish"
 

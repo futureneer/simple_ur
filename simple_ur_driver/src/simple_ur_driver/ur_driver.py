@@ -38,32 +38,126 @@ class URDriver():
   MSG_SETPOINT = 5
   Socket_Closed = True
 
-  ## PID ##
-  Kp = [10.0,10.0,10.0,20.0,20.0,20.0]
+  ### PID VALUES ###
+  Kp = [15.0,15.0,15.0,20.0,20.0,20.0]
   Ki = [0.0,0.0,0.0,0.0,0.0,0.0]
   Kd = [0.0,0.0,0.0,0.0,0.0,0.0]
-  P_value = [0,0,0,0,0,0]
-  I_value = [0,0,0,0,0,0]
-  D_value = [0,0,0,0,0,0]
+  p_val = [0,0,0,0,0,0]
+  i_val = [0,0,0,0,0,0]
+  d_val = [0,0,0,0,0,0]
 
-  Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
-  Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
-  Integrator_max = 500
-  Integrator_min = -500
+  pid_deriv = [0.0,0.0,0.0,0.0,0.0,0.0]
+  pid_integ = [0.0,0.0,0.0,0.0,0.0,0.0]
+  pid_integ_max = 500
+  pid_integ_min = -500
   set_point = [0.0,0.0,0.0,0.0,0.0,0.0]
-  error = [0.0,0.0,0.0,0.0,0.0,0.0]
+  set_pose = p[0.0,0.0,0.0,0.0,0.0,0.0]
+  current_point = [0.0,0.0,0.0,0.0,0.0,0.0]
+  current_pose = p[0.0,0.0,0.0,0.0,0.0,0.0]
+  cmd_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
+  limit_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
+  pid_error = [0.0,0.0,0.0,0.0,0.0,0.0]
+  max_vel = 1.5
 
+  def clamp_velocities():
+    limit_vel = cmd_vel
+    i = 0
+    while i < 6:
+      if cmd_vel[i] > max_vel:
+        limit_vel[i] = max_vel
+      end
+      if cmd_vel[i] < -max_vel:
+        limit_vel[i] = -max_vel
+      end
+      i = i + 1
+    end
+  end
+
+  ### PID SETPOINT FNC ###
   def set_pid_setpoint(data):
+    enter_critical
     point = 0
     while point < data[0]:
       set_point[point] = data[point+1]
       point = point + 1
     end
-    Integrator = [0.0,0.0,0.0,0.0,0.0,0.0]
-    Derivator = [0.0,0.0,0.0,0.0,0.0,0.0]
+    set_pose = p[data[1],data[2],data[3],data[4],data[5],data[6]]
+    pid_integ = [0.0,0.0,0.0,0.0,0.0,0.0]
+    pid_deriv = [0.0,0.0,0.0,0.0,0.0,0.0]
+    exit_critical
   end
 
-  ## PID ##
+  def set_pid_setpoint_from_pose(pose):
+    enter_critical
+    set_pose = pose
+    point = 0
+    while point < 6:
+      set_point[point] = pose[point]
+      point = point + 1
+    end
+    pid_integ = [0.0,0.0,0.0,0.0,0.0,0.0]
+    pid_deriv = [0.0,0.0,0.0,0.0,0.0,0.0]
+    exit_critical
+  end
+
+  def get_current_point():
+    enter_critical
+    current_pose = get_actual_tcp_pose()
+    i = 0
+    while i < 6:
+      current_point[i] = current_pose[i]
+      i = i + 1
+    end
+    exit_critical
+  end
+
+  ### PID UPDATE ###
+  def update_pid(i):
+    pid_error[i] = set_point[i] - current_point[i] 
+    p_val[i] = Kp[i] * pid_error[i]
+    d_val[i] = Kd[i] * ( pid_error[i] - pid_deriv[i])
+    pid_deriv[i] = pid_error[i]
+    pid_integ[i] = pid_integ[i] + pid_error[i]
+    if pid_integ[i] > pid_integ_max:
+      pid_integ[i] = pid_integ_max
+    end
+    if pid_integ[i] < pid_integ_min:
+      pid_integ[i] = pid_integ_min
+    end
+    i_val[i] = pid_integ[i] * Ki[i]
+    upd = p_val[i] + i_val[i] + d_val[i]
+    return upd
+  end
+
+  ### PID UPDATE THREAD ###
+  thread pid_update_thread():
+    while True:
+      get_current_point()
+      D = pose_dist(set_pose,current_pose)
+      if D > .001:
+        enter_critical
+        i = 0
+        while i < 6:
+          cmd_vel[i] = update_pid(i)
+          i = i + 1
+        end
+        clamp_velocities()
+        exit_critical
+        textmsg(limit_vel)
+        speedl(limit_vel,.1,.008)
+      end
+      sleep(.008)
+      # sync()
+    end
+  end
+
+  #### RUN ####
+
+  # Set initial set point to robot position
+  textmsg("Setting Initial PID Set Point")
+  set_pid_setpoint_from_pose( get_actual_tcp_pose() )
+  textmsg(set_point)
+  thread_pid = run pid_update_thread()
 
   ## MAIN LOOP
   while (True):
@@ -82,16 +176,19 @@ class URDriver():
         textmsg("Recieved Test Message")
       end
     elif data[0] == 6:
-      textmsg(data)
+      # textmsg(data)
       set_pid_setpoint(data)
-      textmsg(set_point)
+      # textmsg(set_point)
 
     # else:
       # textmsg("Got a Bad Packet")  
     end
 
-    sleep(.008)
+    sleep(.1)
   end
+  # When finished kill pid thread
+  kill thread_pid
+  textmsg("Finished PID Thread")
 end
 pidProg()
 '''
@@ -113,7 +210,7 @@ pidProg()
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
         # Rate
-        self.run_rate = rospy.Rate(50)
+        self.run_rate = rospy.Rate(125)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
@@ -151,6 +248,8 @@ pidProg()
             self.run_rate.sleep()
 
         # Finish
+        if self.driver_status == 'FOLLOW':
+            self.stop_follow()
         rospy.logwarn('SIMPLE UR - ROBOT INTERFACE CLOSING')
         self.rob.cleanup()
         rospy.logwarn('SIMPLE UR - Robot Cleaning Up')
@@ -192,53 +291,9 @@ pidProg()
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
     def update_follow(self):
-        self.follow_sock_handle.send("(0.1,0.2,0.3,0.41,3.14,0.01)")
-        pass
-        # if not self.follow_goal_reached:
-        #     vel_cmd = []
-        #     # append a velocity update for each parameter to command velocities
-        #     with self.pid_lock:
-        #         for pid, p in zip(self._pid, self.current_axis_angle):
-        #             vel_cmd.append(pid.update(p))
-        #     # Check velocities against limits
-        #     for v, i in zip(vel_cmd, range(6)):
-        #         if v > 0:
-        #             if v > self.MAX_VEL:
-        #                 vel_cmd[i] = self.MAX_VEL
-        #         else:
-        #             if v < -self.MAX_VEL:
-        #                 vel_cmd[i] = -self.MAX_VEL
-        #     # Scale Acceleration
-        #     vel_avg = abs(sum(vel_cmd)/6.0)
-        #     acc_scale = (vel_avg/self.MAX_VEL)
-        #     scaled_accel = self.MAX_ACC*acc_scale
-        #     # clamp lower accel limit
-        #     if scaled_accel < .05: scaled_accel = .05
-        #     # Append other parameters to vel command
-        #     vel_cmd.append(scaled_accel)
-        #     # print 'acc: '+str(scaled_accel)+' avg vel: '+str(vel_avg)
-        #     vel_cmd.append(self.follow_timeout)
-        #     # Create and clean up program
-        #     prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vel_cmd)
-        #     # rospy.logwarn(prog)
-        #     if type(prog) != bytes:
-        #         prog = prog.encode()
-        #     # Send command to socket
-        #     self.rt_socket.send(prog)
-        # # DEBUG    
-        # # else:
-        # #     pass
-        #     # rospy.loginfo('Goal: <'+str(self.follow_goal_axis_angle)+'>')
-        # # DEBUG
-
-        
-        # # Check to see if follow goal is reached
-        # if self.reached_goal(self.follow_goal_axis_angle, self.current_axis_angle, .001):
-        #     if self.follow_goal_reached == False:
-        #         rospy.logwarn('SIMPLE UR - Follow Goal Reached')
-        #         self.follow_goal_reached = True
-        # else:
-        #     self.follow_goal_reached = False
+        if self.follow_goal_axis_angle != None:
+            if self.follow_sock_handle != None:
+                self.follow_sock_handle.send("({},{},{},{},{},{})".format(*self.follow_goal_axis_angle))
 
     def start_follow(self):
         rospy.loginfo('Setting up follow mode')
@@ -265,9 +320,17 @@ pidProg()
             rospy.loginfo('Sending Program Close Command')
             self.follow_sock_handle.send("(3)")
             rospy.sleep(.01)
+            self.follow_sock_handle.send("(3)")
+            rospy.sleep(.01)
+            self.follow_sock_handle.send("(3)")
+            rospy.sleep(.01)
+            self.follow_sock_handle.send("(3)")
+            rospy.sleep(.01)
             rospy.loginfo('Cleaning Up Follow Sockets')
             self.follow_sock_handle.close()
             self.follow_socket.close()
+            self.follow_socket = None
+            self.follow_sock_handle = None
         else:
             rospy.logwarn("Handle Not Found")
 
@@ -276,13 +339,14 @@ pidProg()
             # Set follow goal pose as axis-angle
             F_goal = tf_c.fromMsg(msg.pose)
             a,axis = F_goal.M.GetRotAngle()
-            self.follow_goal_axis_angle = list(F_goal.p) + [a*axis[0],a*axis[1],a*axis[2]]
+            with self.pid_lock:
+                self.follow_goal_axis_angle = list(F_goal.p) + [a*axis[0],a*axis[1],a*axis[2]]
             # Broadcast goal for debugging purposes
             self.broadcaster_.sendTransform(tuple(F_goal.p),tuple(F_goal.M.GetQuaternion()),rospy.Time.now(), '/ur_goal','/base_link')
             # Set goal pose as PID set point
-            with self.pid_lock:
-                for pid, g in zip(self._pid, self.follow_goal_axis_angle):
-                    pid.setPoint(g)
+            # with self.pid_lock:
+            #     for pid, g in zip(self._pid, self.follow_goal_axis_angle):
+            #         pid.setPoint(g)
         else:
             rospy.logerr("FOLLOW NOT ENABLED!")
 
