@@ -59,6 +59,7 @@ class URDriver():
   pid_error = [0.0,0.0,0.0,0.0,0.0,0.0]
   max_vel = 1.5
 
+  # Limit the Velocities to max_vel
   def clamp_velocities():
     limit_vel = cmd_vel
     i = 0
@@ -73,7 +74,7 @@ class URDriver():
     end
   end
 
-  ### PID SETPOINT FNC ###
+  # Set the PID setpoint from a packet
   def set_pid_setpoint(data):
     enter_critical
     point = 0
@@ -87,6 +88,7 @@ class URDriver():
     exit_critical
   end
 
+  # Set the PID setpoint from a pose
   def set_pid_setpoint_from_pose(pose):
     enter_critical
     set_pose = pose
@@ -100,6 +102,7 @@ class URDriver():
     exit_critical
   end
 
+  # update the current pose of the robot in pose and list form
   def get_current_point():
     enter_critical
     current_pose = get_actual_tcp_pose()
@@ -143,10 +146,15 @@ class URDriver():
         end
         clamp_velocities()
         exit_critical
-        textmsg(limit_vel)
-        speedl(limit_vel,.1,.008)
       end
-      sleep(.008)
+      sync()
+    end
+  end
+
+  thread move_thread():
+    while True:
+      textmsg(limit_vel)
+      speedl(limit_vel,.1,.008)
       # sync()
     end
   end
@@ -157,11 +165,13 @@ class URDriver():
   textmsg("Setting Initial PID Set Point")
   set_pid_setpoint_from_pose( get_actual_tcp_pose() )
   textmsg(set_point)
-  thread_pid = run pid_update_thread()
+  thread_pid_h = run pid_update_thread()
+  thread_move_h = run move_thread()
 
   ## MAIN LOOP
   while (True):
     if (Socket_Closed == True):
+      # check boolian from socket_open
       socket_open("192.168.1.5", 30000)
       global Socket_Closed = False 
     end
@@ -187,7 +197,8 @@ class URDriver():
     sleep(.1)
   end
   # When finished kill pid thread
-  kill thread_pid
+  kill thread_pid_h
+  kill thread_move_h
   textmsg("Finished PID Thread")
 end
 pidProg()
