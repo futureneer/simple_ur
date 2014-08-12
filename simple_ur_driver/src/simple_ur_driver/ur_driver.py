@@ -56,12 +56,15 @@ class URDriver():
   current_pose = p[0.0,0.0,0.0,0.0,0.0,0.0]
   cmd_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
   limit_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
+  saved_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
   pid_error = [0.0,0.0,0.0,0.0,0.0,0.0]
   max_vel = 1.5
+  max_dv = 2*.008
   D = 0
 
   # Limit the Velocities to max_vel
   def clamp_velocities():
+    # Impose velocity limits
     limit_vel = cmd_vel
     i = 0
     while i < 6:
@@ -73,6 +76,19 @@ class URDriver():
       end
       i = i + 1
     end
+    # Check acceleration
+    i = 0
+    while i < 6:
+      dv = saved_vel[i] - limit_vel[i]
+      if dv > max_dv:
+        limit_vel[i] = saved_vel[i] + max_dv
+      end
+      if dv < -max_dv:
+        limit_vel[i] = saved_vel[i] - max_dv
+      end
+    end
+    # Update saved Velocities
+    saved_vel = limit_vel
   end
 
   # Set the PID setpoint from a packet
@@ -175,9 +191,12 @@ class URDriver():
   ## MAIN LOOP
   while (True):
     if (Socket_Closed == True):
-      # check boolian from socket_open
-      socket_open("192.168.1.5", 30000)
-      global Socket_Closed = False 
+      # Keep Checking socket to see if opening it failed
+      r = socket_open("192.168.1.5", 30000)
+      if r == True:
+        global Socket_Closed = False 
+      else:
+        textmsg("Socket Failed to Open")
     end
 
     data = socket_read_ascii_float(6)
