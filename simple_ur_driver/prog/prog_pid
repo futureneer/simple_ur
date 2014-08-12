@@ -6,9 +6,9 @@ def pidProg():
   Socket_Closed = True
 
   ### PID VALUES ###
-  Kp = [15.0,15.0,15.0,20.0,20.0,20.0]
+  Kp = [2.0,2.0,2.0,5.0,5.0,5.0]
   Ki = [0.0,0.0,0.0,0.0,0.0,0.0]
-  Kd = [0.0,0.0,0.0,0.0,0.0,0.0]
+  Kd = [0.1,0.1,0.1,.1,.1,.1]
   p_val = [0,0,0,0,0,0]
   i_val = [0,0,0,0,0,0]
   d_val = [0,0,0,0,0,0]
@@ -25,6 +25,7 @@ def pidProg():
   limit_vel = [0.0,0.0,0.0,0.0,0.0,0.0]
   pid_error = [0.0,0.0,0.0,0.0,0.0,0.0]
   max_vel = 1.5
+  D = 0
 
   # Limit the Velocities to max_vel
   def clamp_velocities():
@@ -120,9 +121,12 @@ def pidProg():
 
   thread move_thread():
     while True:
-      textmsg(limit_vel)
-      speedl(limit_vel,.1,.008)
-      # sync()
+      if D > .001:
+        textmsg(limit_vel)
+        speedl(limit_vel,1.0,.008)
+      else:
+        sync()
+      end
     end
   end
 
