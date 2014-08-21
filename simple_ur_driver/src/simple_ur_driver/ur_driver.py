@@ -177,9 +177,20 @@ class URDriver():
     end
   end
 
+  # thread move_thread():
+  #   while True:
+  #     speedl(limit_vel,1.0,.0082)
+  #   end
+  # end
+
   thread move_thread():
     while True:
-      speedl(limit_vel,1.0,.007)
+      current_pose = get_actual_tcp_pose()
+      D = pose_dist(set_pose,current_pose)
+      if D > .001:
+        movel(set_pose,t=.008)
+      end
+      sync()
     end
   end
 
@@ -189,7 +200,7 @@ class URDriver():
   textmsg("Setting Initial PID Set Point")
   set_pid_setpoint_from_pose( get_actual_tcp_pose() )
   textmsg(set_point)
-  thread_pid_h = run pid_update_thread()
+  # thread_pid_h = run pid_update_thread()
   thread_move_h = run move_thread()
 
   ## MAIN LOOP
@@ -223,7 +234,7 @@ class URDriver():
     sleep(.1)
   end
   # When finished kill pid thread
-  kill thread_pid_h
+  # kill thread_pid_h
   kill thread_move_h
   textmsg("Finished PID Thread")
 end
@@ -247,7 +258,7 @@ pidProg()
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
         # Rate
-        self.run_rate = rospy.Rate(50)
+        self.run_rate = rospy.Rate(120)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
