@@ -84,10 +84,10 @@ class URDriver():
     while i < 6:
         vel_diff = saved_vel[i] - limit_vel[i]
         if vel_diff > max_vel_diff[i]:
-          limit_vel[i] = saved_vel[i] - max_vel_diff[i]
+          limit_vel[i] = saved_vel[i] - .1 * max_vel_diff[i]
         end
         if vel_diff < -max_vel_diff[i]:
-          limit_vel[i] = saved_vel[i] + max_vel_diff[i]
+          limit_vel[i] = saved_vel[i] + .1 * max_vel_diff[i]
         end
         i = i + 1
     end
@@ -177,20 +177,9 @@ class URDriver():
     end
   end
 
-  # thread move_thread():
-  #   while True:
-  #     speedl(limit_vel,1.0,.0082)
-  #   end
-  # end
-
   thread move_thread():
     while True:
-      current_pose = get_actual_tcp_pose()
-      D = pose_dist(set_pose,current_pose)
-      if D > .001:
-        movel(set_pose,t=.008)
-      end
-      sync()
+      speedl(limit_vel,1.0,.015)
     end
   end
 
@@ -200,7 +189,7 @@ class URDriver():
   textmsg("Setting Initial PID Set Point")
   set_pid_setpoint_from_pose( get_actual_tcp_pose() )
   textmsg(set_point)
-  # thread_pid_h = run pid_update_thread()
+  thread_pid_h = run pid_update_thread()
   thread_move_h = run move_thread()
 
   ## MAIN LOOP
@@ -234,7 +223,7 @@ class URDriver():
     sleep(.1)
   end
   # When finished kill pid thread
-  # kill thread_pid_h
+  kill thread_pid_h
   kill thread_move_h
   textmsg("Finished PID Thread")
 end
@@ -258,7 +247,7 @@ pidProg()
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
         # Rate
-        self.run_rate = rospy.Rate(120)
+        self.run_rate = rospy.Rate(30)
 
         ### Set Up Robot ###
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
@@ -269,7 +258,7 @@ pidProg()
         else:
             rospy.logwarn('SIMPLE UR - ROBOT CONNECTED SUCCESSFULLY')
             rospy.logwarn('SIMPLE UR - GOT REAL TIME <WRITE> INTERFACE TO ROBOT')        
-            self.rt_socket = socket.create_connection(('192.168.1.155', 30003), timeout=0.5)
+            # self.rt_socket = socket.create_connection(('192.168.1.155', 30003), timeout=0.5)
             rospy.logwarn('SIMPLE UR - GOT REAL TIME <READ> INTERFACE TO ROBOT')
             self.rtm = self.rob.get_realtime_monitor()
             self.driver_status = 'IDLE'
@@ -283,8 +272,8 @@ pidProg()
 
         ### START LOOP ###
         while not rospy.is_shutdown():
-            msg = struct.pack("!i", 10000)
-            self.rt_socket.send(msg)
+            # msg = struct.pack("!i", 10000)
+            # self.rt_socket.send(msg)
 
             self.update()
             self.check_driver_status()
@@ -303,7 +292,7 @@ pidProg()
         rospy.logwarn('SIMPLE UR - Robot Cleaning Up')
         self.rob.shutdown()
         rospy.logwarn('SIMPLE UR - Robot Interface Shut Down')
-        self.rt_socket.close()
+        # self.rt_socket.close()
         rospy.logwarn('SIMPLE UR - Real Time <WRITE> Socket Closed')
 
     def reset_follow_goal(self):
@@ -492,9 +481,11 @@ pidProg()
 
     def check_robot_state(self):
         mode = self.rob.get_all_data()['RobotModeData']
+        # rospy.logwarn(mode['robotMode'])
 
         if not mode['isPowerOnRobot']:
             self.robot_state = 'POWER OFF'
+            # rospy.logwarn(self.robot_state)
             return
 
         if mode['isEmergencyStopped']:
@@ -506,7 +497,12 @@ pidProg()
         elif mode['isProgramRunning']:
             self.robot_state ='RUNNING PROGRAM'
         else:
-            self.robot_state = 'RUNNING IDLE'
+            if mode['robotMode'] == 0:
+                if all([self.driver_status != 'SERVO',self.driver_status != 'FOLLOW',self.driver_status != 'TEACH']):
+                    self.robot_state = 'RUNNING IDLE'
+                    self.driver_status = 'IDLE'
+
+        # rospy.logwarn(self.robot_state)
 
 
 if __name__ == "__main__":

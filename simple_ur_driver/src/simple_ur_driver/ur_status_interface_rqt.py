@@ -40,6 +40,7 @@ class URStatusPanel(Plugin):
         # self.freedrive = False
         # self.servo = 'DISABLED'
         self.listener_ = TransformListener()
+        self.suction_pub_ = rospy.Publisher('/toggle_led', UInt16)
 
         self.driver_status_sub = rospy.Subscriber('/ur_robot/driver_status',String,self.driver_status_cb)
         self.robot_state_sub = rospy.Subscriber('/ur_robot/robot_state',String,self.robot_state_cb)
@@ -53,13 +54,31 @@ class URStatusPanel(Plugin):
         self._widget.gripper_open_btn.clicked.connect(self.gripper_open)
         self._widget.gripper_close_btn.clicked.connect(self.gripper_close)
 
+        self._widget.suction_on_btn.clicked.connect(self.suction_on)
+        self._widget.suction_off_btn.clicked.connect(self.suction_off)
+
         self.driver_status = 'DISCONNECTED'
         self.robot_state = 'DISCONNECTED'
+        self.suction_state = 'OFF'
 
         self.status_timer = QTimer(self)
         self.connect(self.status_timer, QtCore.SIGNAL("timeout()"), self.check_status)
         self.status_timer.start(100)
         self.update_timeout = 0
+
+    def suction_on(self):
+        self.suction_pub_.publish(UInt16(3))
+        self._widget.suction_state_label.setText('ON')
+        self._widget.suction_state_label.setStyleSheet('color:#ffffff;background-color:#3FC4FC')
+        self._widget.msg_label.setText("SUCTION ON")
+        self.suction_state = 'ON'
+
+    def suction_off(self):
+        self.suction_pub_.publish(UInt16(0))
+        self._widget.suction_state_label.setText('OFF')
+        self._widget.suction_state_label.setStyleSheet('color:#ffffff;background-color:#3FC4FC')
+        self._widget.msg_label.setText("SUCTION OFF")
+        self.suction_state = 'OFF'
 
     def gripper_open(self):
         try:
@@ -230,6 +249,8 @@ class URStatusPanel(Plugin):
         self._widget.msg_label.setText("SERVO DISABLED")
 
     def check_status(self):
+        rospy.logwarn(self.driver_status)
+        
         if self.driver_status == 'IDLE':
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EBCF1A')
@@ -253,6 +274,7 @@ class URStatusPanel(Plugin):
             self._widget.mode_label.setText(str(self.driver_status))
             self._widget.mode_label.setStyleSheet('color:#ffffff; background-color:#EB1A1D')
             self.reset()
+
 
         if self.robot_state == 'POWER OFF':
             self._widget.status_label.setText(self.robot_state)

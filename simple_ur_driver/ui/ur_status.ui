@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>375</width>
-    <height>427</height>
+    <height>607</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -319,6 +319,131 @@
            </layout>
           </widget>
          </item>
+         <item row="8" column="0" colspan="2">
+          <widget class="QFrame" name="frame">
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_4">
+            <property name="margin">
+             <number>3</number>
+            </property>
+            <item row="1" column="2">
+             <widget class="QPushButton" name="freedrive_disable_btn">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>80</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>18</pointsize>
+                <weight>75</weight>
+                <bold>true</bold>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true"/>
+              </property>
+              <property name="text">
+               <string>OFF</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QPushButton" name="freedrive_enable_btn">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>80</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>18</pointsize>
+                <weight>75</weight>
+                <bold>true</bold>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true"/>
+              </property>
+              <property name="text">
+               <string>ON</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="freedrive_enable_label">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>16777215</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>16</pointsize>
+                <weight>75</weight>
+                <bold>true</bold>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">background-color:#FF9100;color:#ffffff</string>
+              </property>
+              <property name="lineWidth">
+               <number>1</number>
+              </property>
+              <property name="text">
+               <string>DISABLED</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_9">
+              <property name="font">
+               <font>
+                <pointsize>12</pointsize>
+                <weight>75</weight>
+                <bold>true</bold>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">c</string>
+              </property>
+              <property name="text">
+               <string>Teach Mode</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
          <item row="0" column="0">
           <widget class="QLabel" name="label_3">
            <property name="minimumSize">
@@ -447,19 +572,6 @@
            </property>
           </widget>
          </item>
-         <item row="10" column="0">
-          <spacer name="verticalSpacer">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>40</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
          <item row="4" column="0" colspan="2">
           <widget class="QLabel" name="label_6">
            <property name="minimumSize">
@@ -516,90 +628,31 @@
            </layout>
           </widget>
          </item>
-         <item row="8" column="0" colspan="2">
-          <widget class="QFrame" name="frame">
+         <item row="10" column="0" colspan="2">
+          <widget class="QFrame" name="frame_4">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
            </property>
            <property name="frameShadow">
             <enum>QFrame::Raised</enum>
            </property>
-           <layout class="QGridLayout" name="gridLayout_4">
-            <property name="margin">
-             <number>3</number>
-            </property>
-            <item row="1" column="2">
-             <widget class="QPushButton" name="freedrive_disable_btn">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>30</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>80</width>
-                <height>30</height>
-               </size>
-              </property>
+           <layout class="QGridLayout" name="gridLayout_6">
+            <item row="0" column="0" colspan="3">
+             <widget class="QLabel" name="label_10">
               <property name="font">
                <font>
-                <pointsize>18</pointsize>
+                <pointsize>12</pointsize>
                 <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
-              <property name="styleSheet">
-               <string notr="true"/>
-              </property>
               <property name="text">
-               <string>OFF</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QPushButton" name="freedrive_enable_btn">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>30</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>80</width>
-                <height>30</height>
-               </size>
-              </property>
-              <property name="font">
-               <font>
-                <pointsize>18</pointsize>
-                <weight>75</weight>
-                <bold>true</bold>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true"/>
-              </property>
-              <property name="text">
-               <string>ON</string>
+               <string>Suction Control</string>
               </property>
              </widget>
             </item>
             <item row="1" column="0">
-             <widget class="QLabel" name="freedrive_enable_label">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>30</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>16777215</width>
-                <height>30</height>
-               </size>
-              </property>
+             <widget class="QLabel" name="suction_state_label">
               <property name="font">
                <font>
                 <pointsize>16</pointsize>
@@ -608,38 +661,83 @@
                </font>
               </property>
               <property name="styleSheet">
-               <string notr="true">background-color:#FF9100;color:#ffffff</string>
-              </property>
-              <property name="lineWidth">
-               <number>1</number>
+               <string notr="true">background-color:#3FC4FC;color:#ffffff</string>
               </property>
               <property name="text">
-               <string>DISABLED</string>
+               <string>ON</string>
               </property>
               <property name="alignment">
                <set>Qt::AlignCenter</set>
               </property>
              </widget>
             </item>
-            <item row="0" column="0">
-             <widget class="QLabel" name="label_9">
+            <item row="1" column="1">
+             <widget class="QPushButton" name="suction_on_btn">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>80</width>
+                <height>30</height>
+               </size>
+              </property>
               <property name="font">
                <font>
-                <pointsize>12</pointsize>
+                <pointsize>18</pointsize>
                 <weight>75</weight>
                 <bold>true</bold>
                </font>
               </property>
-              <property name="styleSheet">
-               <string notr="true">c</string>
+              <property name="text">
+               <string>ON</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="2">
+             <widget class="QPushButton" name="suction_off_btn">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>80</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>18</pointsize>
+                <weight>75</weight>
+                <bold>true</bold>
+               </font>
               </property>
               <property name="text">
-               <string>Teach Mode</string>
+               <string>OFF</string>
               </property>
              </widget>
             </item>
            </layout>
           </widget>
+         </item>
+         <item row="11" column="0" colspan="2">
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </widget>
