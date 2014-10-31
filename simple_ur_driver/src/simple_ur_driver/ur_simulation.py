@@ -51,18 +51,18 @@ class URDriver():
         self.driver_status = 'SIMULATION'
         self.robot_state = 'POWER OFF'
         robot = URDF.from_parameter_server()
-        kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
-        # self.q = kdl_kin.random_joint_angles()
+        self.kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
+        # self.q = self.kdl_kin.random_joint_angles()
         self.q = [-1.5707,-.785,-3.1415+.785,-1.5707-.785,-1.5707,-3.1415]
-        self.start_pose = kdl_kin.forward(self.q)
+        self.start_pose = self.kdl_kin.forward(self.q)
         self.F_start = tf_c.fromMatrix(self.start_pose)
-        rospy.logwarn(self.start_pose)
-        rospy.logwarn(type(self.start_pose))
-        # pose = kdl_kin.forward(q)
-        # q_ik = kdl_kin.inverse(pose, q+0.3) # inverse kinematics
+        # rospy.logwarn(self.start_pose)
+        # rospy.logwarn(type(self.start_pose))
+        # pose = self.kdl_kin.forward(q)
+        # q_ik = self.kdl_kin.inverse(pose, q+0.3) # inverse kinematics
         # if q_ik is not None:
-        #     pose_sol = kdl_kin.forward(q_ik) # should equal pose
-        # J = kdl_kin.jacobian(q)
+        #     pose_sol = self.kdl_kin.forward(q_ik) # should equal pose
+        # J = self.kdl_kin.jacobian(q)
         # rospy.logwarn('q:'+str(q))
         # rospy.logwarn('q_ik:'+str(q_ik))
         # rospy.logwarn('pose:'+str(pose))
@@ -82,52 +82,54 @@ class URDriver():
         # Finish
         rospy.logwarn('SIMPLE UR - Simulation Finished')
 
-
-# from urdf_parser_py.urdf import URDF
-# from pykdl_utils.kdl_kinematics import KDLKinematics
-# robot = URDF.from_parameter_server()
-# kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
-# q = kdl_kin.random_joint_angles()
-# pose = kdl_kin.forward(q) # forward kinematics (returns homogeneous 4x4 numpy.mat)
-# q_ik = kdl_kin.inverse(pose, q+0.3) # inverse kinematics
-# if q_ik is not None:
-#     pose_sol = kdl_kin.forward(q_ik) # should equal pose
-# J = kdl_kin.jacobian(q)
-# print 'q:', q
-# print 'q_ik:', q_ik
-# print 'pose:', pose
-# if q_ik is not None:
-#     print 'pose_sol:', pose_sol
-# print 'J:', J
-
     def update(self):
         if not self.driver_status == 'DISCONNECTED':
+
+            # Calculate Joint Positions for "TARGET FRAME"
+            try:
+                F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
+                F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
+                F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
+                F_command = F_base_world.Inverse()*F_target_world
+
+                M_command = tf_c.toMatrix(F_command)
+
+                # M_current = self.kdl_kin.forward(self.q)
+                q_ik = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
+                if q_ik is not None:
+                    pose_sol = self.kdl_kin.forward(q_ik) # should equal pose
+                    # Update Joint Angles
+                    # rospy.logwarn(q_ik)
+
+                    self.q = q_ik
+                    self.current_joint_positions = self.q
+                    msg = JointState()
+                    msg.header.stamp = rospy.get_rostime()
+                    msg.header.frame_id = "robot_secondary_interface_data"
+                    msg.name = self.JOINT_NAMES
+                    msg.position = self.current_joint_positions
+                    msg.velocity = [0]*6
+                    msg.effort = [0]*6
+                    self.joint_state_publisher.publish(msg)
+                    
+                    F = self.F_start
+                    self.current_tcp_pose = tf_c.toMsg(F)
+                    self.current_tcp_frame = F
+                    self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
+                else:
+                    rospy.logwarn('no solution found')
+
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+                rospy.logwarn(str(e))
+
             # Get Joint Positions
-            self.current_joint_positions = self.q
-            msg = JointState()
-            msg.header.stamp = rospy.get_rostime()
-            msg.header.frame_id = "robot_secondary_interface_data"
-            msg.name = self.JOINT_NAMES
-            msg.position = self.current_joint_positions
-            msg.velocity = [0]*6
-            msg.effort = [0]*6
-            self.joint_state_publisher.publish(msg)
-            
-            # # Get TCP Position
-            # tcp_angle_axis = self.rob.getl()
-            # # Create Frame from XYZ and Angle Axis
-            # T = PyKDL.Frame()   
-            # axis = PyKDL.Vector(tcp_angle_axis[3],tcp_angle_axis[4],tcp_angle_axis[5])
-            # # Get norm and normalized axis
-            # angle = axis.Normalize()
-            # # Make frame
-            # T.p = PyKDL.Vector(tcp_angle_axis[0],tcp_angle_axis[1],tcp_angle_axis[2])
-            # T.M = PyKDL.Rotation.Rot(axis,angle)
-            # # Create Pose
-            F = self.F_start
-            self.current_tcp_pose = tf_c.toMsg(F)
-            self.current_tcp_frame = F
-            self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
+
+            # try:
+            #   F_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/endpoint',rospy.Time(0)))
+            #   rospy.logwarn(F_world.p)
+            #   rospy.logwarn(F_world.M.GetRPY())
+            # except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+            #     rospy.logwarn(str(e))
 
     def set_teach_mode_call(self,req):
         if self.driver_status == 'SERVO':
