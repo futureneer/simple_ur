@@ -112,7 +112,7 @@ class URDriver():
                     msg.effort = [0]*6
                     self.joint_state_publisher.publish(msg)
                     
-                    F = self.F_start
+                    F = F_command
                     self.current_tcp_pose = tf_c.toMsg(F)
                     self.current_tcp_frame = F
                     self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
@@ -127,6 +127,11 @@ class URDriver():
                     msg.velocity = [0]*6
                     msg.effort = [0]*6
                     self.joint_state_publisher.publish(msg)
+
+                    F = F_command
+                    self.current_tcp_pose = tf_c.toMsg(F)
+                    self.current_tcp_frame = F
+                    self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
                 rospy.logwarn(str(e))
