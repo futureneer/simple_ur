@@ -45,7 +45,7 @@ class URDriver():
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         # self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
         # Rate
-        self.run_rate = rospy.Rate(30)
+        self.run_rate = rospy.Rate(100)
 
         ### Set Up Simulated Robot ###
         self.driver_status = 'SIMULATION'
@@ -53,7 +53,7 @@ class URDriver():
         robot = URDF.from_parameter_server()
         self.kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
         # self.q = self.kdl_kin.random_joint_angles()
-        self.q = [-1.5707,-.785,-3.1415+.785,-1.5707-.785,-1.5707,-3.1415]
+        self.q = [-1.5707,-.785,-3.1415+.785,-1.5707-.785,-1.5707,3.1415]
         self.start_pose = self.kdl_kin.forward(self.q)
         self.F_start = tf_c.fromMatrix(self.start_pose)
         # rospy.logwarn(self.start_pose)
@@ -118,6 +118,15 @@ class URDriver():
                     self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
                 else:
                     rospy.logwarn('no solution found')
+                    self.current_joint_positions = self.q
+                    msg = JointState()
+                    msg.header.stamp = rospy.get_rostime()
+                    msg.header.frame_id = "robot_secondary_interface_data"
+                    msg.name = self.JOINT_NAMES
+                    msg.position = self.current_joint_positions
+                    msg.velocity = [0]*6
+                    msg.effort = [0]*6
+                    self.joint_state_publisher.publish(msg)
 
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
                 rospy.logwarn(str(e))
