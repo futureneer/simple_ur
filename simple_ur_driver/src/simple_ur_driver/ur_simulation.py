@@ -48,7 +48,7 @@ class URDriver():
         self.run_rate = rospy.Rate(100)
 
         ### Set Up Simulated Robot ###
-        self.driver_status = 'SIMULATION'
+        self.driver_status = 'IDLE'
         self.robot_state = 'POWER OFF'
         robot = URDF.from_parameter_server()
         self.kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
@@ -72,38 +72,38 @@ class URDriver():
 
         ### START LOOP ###
         while not rospy.is_shutdown():
-            self.update()
+            if self.driver_status == 'TEACH':
+                self.update_from_marker()
+            
+            # if self.driver_status == 'SERVO':
+            #     self.update_follow()
+
+            # Publish and Sleep
             self.publish_status()
-            if self.driver_status == 'FOLLOW':
-                self.update_follow()
-            # Sleep between commands to robot
             self.run_rate.sleep()
 
         # Finish
         rospy.logwarn('SIMPLE UR - Simulation Finished')
 
-    def update(self):
-        if not self.driver_status == 'DISCONNECTED':
+    def update_from_marker(self):
+        try:
+            F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
+            F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
+            F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
+            F_command = F_base_world.Inverse()*F_target_world
+            M_command = tf_c.toMatrix(F_command)
 
-            # Calculate Joint Positions for "TARGET FRAME"
-            try:
-                F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
-                F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
-                F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
-                F_command = F_base_world.Inverse()*F_target_world
-                M_command = tf_c.toMatrix(F_command)
+            joint_positions = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
+            if joint_positions is not None:
+                pose_sol = self.kdl_kin.forward(joint_positions) # should equal pose
+                self.q = joint_positions
+            else:
+                rospy.logwarn('no solution found')
 
-                joint_positions = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
-                if joint_positions is not None:
-                    pose_sol = self.kdl_kin.forward(joint_positions) # should equal pose
-                    self.q = joint_positions
-                else:
-                    rospy.logwarn('no solution found')
+            self.send_command(F_command)
 
-                self.send_command(F_command)
-
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-                rospy.logwarn(str(e))
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+            rospy.logwarn(str(e))
 
     def send_command(self, F_command):
         self.current_joint_positions = self.q
@@ -122,42 +122,22 @@ class URDriver():
         self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
     def set_teach_mode_call(self,req):
-        if self.driver_status == 'SERVO':
-            rospy.logwarn('SIMPLE UR -- cannot enter teach mode, servo mode is active')
-            return 'FAILED - servo mode is active'
+        if req.enable == True:
+            # self.rob.set_freedrive(True)
+            self.driver_status = 'TEACH'
+            return 'SUCCESS - teach mode enabled'
         else:
-            if req.enable == True:
-                self.rob.set_freedrive(True)
-                self.driver_status = 'TEACH'
-                return 'SUCCESS - teach mode enabled'
-            else:
-                self.rob.set_freedrive(False)
-                self.driver_status = 'IDLE'
-                return 'SUCCESS - teach mode disabled'
+            # self.rob.set_freedrive(False)
+            self.driver_status = 'IDLE'
+            return 'SUCCESS - teach mode disabled'
 
     def set_servo_mode_call(self,req):
-        if self.driver_status == 'TEACH':
-            rospy.logwarn('SIMPLE UR -- cannot enter servo mode, teach mode is active')
-            return 'FAILED - teach mode is active'
-        else:
-            rospy.logwarn('MODE IS ['+req.mode+']')
-            if req.mode == 'SERVO':
-                self.driver_status = 'SERVO'
-                return 'SUCCESS - servo mode enabled'
-            elif req.mode == 'FOLLOW':
-                rospy.logwarn('requested follow mode')
-                if self.start_follow():
-                    self.driver_status = 'FOLLOW'
-                    self.reset_follow_goal()
-                    return 'SUCCESS - follow mode enabled'
-                else:
-                    return 'FAILED - Could not create follow socket'
-            elif req.mode == 'DISABLE':
-                if self.driver_status == 'FOLLOW':
-                    self.stop_follow()
-                    self.reset_follow_goal()
-                self.driver_status = 'IDLE'
-                return 'SUCCESS - servo mode disabled'
+        if req.mode == 'SERVO':
+            self.driver_status = 'SERVO'
+            return 'SUCCESS - servo mode enabled'
+        elif req.mode == 'DISABLE':
+            self.driver_status = 'IDLE'
+            return 'SUCCESS - servo mode disabled'
 
     def set_stop_call(self,req):
         rospy.logwarn('SIMPLE UR - STOPPING ROBOT')
@@ -165,7 +145,7 @@ class URDriver():
         return 'SUCCESS - stopped robot'
 
     def servo_to_pose_call(self,req): 
-        if self.driver_status == 'SIMULATION':
+        if self.driver_status == 'SERVO':
             rospy.logwarn(req)
             F_command = tf_c.fromMsg(req.target)
             M_command = tf_c.toMatrix(F_command)
