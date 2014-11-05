@@ -26,6 +26,14 @@
   <include file="$(find ur_description)/launch/ur5_upload.launch">
     <arg name="limited" value="$(arg limited)"/>
   </include>
+
+  <group ns="/ur5/ghost">
+    <include file="$(find ur_description)/launch/ur5_upload.launch">
+      <arg name="limited" value="$(arg limited)"/>
+      <remap from="joint_states" to="/ur5/ghost/joint_states"/>
+    </include>
+  </group>
+
   <!-- <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" > -->
       <!-- <remap from="joint_states" to="/ur5/gripper/joint_states"/> -->
   <!-- </node> -->

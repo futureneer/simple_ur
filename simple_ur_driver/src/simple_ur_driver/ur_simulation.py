@@ -59,14 +59,14 @@ class URDriver():
         # rospy.logwarn(self.start_pose)
         # rospy.logwarn(type(self.start_pose))
         # pose = self.kdl_kin.forward(q)
-        # q_ik = self.kdl_kin.inverse(pose, q+0.3) # inverse kinematics
-        # if q_ik is not None:
-        #     pose_sol = self.kdl_kin.forward(q_ik) # should equal pose
+        # joint_positions = self.kdl_kin.inverse(pose, q+0.3) # inverse kinematics
+        # if joint_positions is not None:
+        #     pose_sol = self.kdl_kin.forward(joint_positions) # should equal pose
         # J = self.kdl_kin.jacobian(q)
         # rospy.logwarn('q:'+str(q))
-        # rospy.logwarn('q_ik:'+str(q_ik))
+        # rospy.logwarn('joint_positions:'+str(joint_positions))
         # rospy.logwarn('pose:'+str(pose))
-        # if q_ik is not None:
+        # if joint_positions is not None:
         #     rospy.logwarn('pose_sol:'+str(pose_sol))
         # rospy.logwarn('J:'+str(J))
 
@@ -91,59 +91,35 @@ class URDriver():
                 F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
                 F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
                 F_command = F_base_world.Inverse()*F_target_world
-
                 M_command = tf_c.toMatrix(F_command)
 
-                # M_current = self.kdl_kin.forward(self.q)
-                q_ik = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
-                if q_ik is not None:
-                    pose_sol = self.kdl_kin.forward(q_ik) # should equal pose
-                    # Update Joint Angles
-                    # rospy.logwarn(q_ik)
-
-                    self.q = q_ik
-                    self.current_joint_positions = self.q
-                    msg = JointState()
-                    msg.header.stamp = rospy.get_rostime()
-                    msg.header.frame_id = "robot_secondary_interface_data"
-                    msg.name = self.JOINT_NAMES
-                    msg.position = self.current_joint_positions
-                    msg.velocity = [0]*6
-                    msg.effort = [0]*6
-                    self.joint_state_publisher.publish(msg)
-                    
-                    F = F_command
-                    self.current_tcp_pose = tf_c.toMsg(F)
-                    self.current_tcp_frame = F
-                    self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
+                joint_positions = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
+                if joint_positions is not None:
+                    pose_sol = self.kdl_kin.forward(joint_positions) # should equal pose
+                    self.q = joint_positions
                 else:
                     rospy.logwarn('no solution found')
-                    self.current_joint_positions = self.q
-                    msg = JointState()
-                    msg.header.stamp = rospy.get_rostime()
-                    msg.header.frame_id = "robot_secondary_interface_data"
-                    msg.name = self.JOINT_NAMES
-                    msg.position = self.current_joint_positions
-                    msg.velocity = [0]*6
-                    msg.effort = [0]*6
-                    self.joint_state_publisher.publish(msg)
 
-                    F = F_command
-                    self.current_tcp_pose = tf_c.toMsg(F)
-                    self.current_tcp_frame = F
-                    self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
+                self.send_command(F_command)
 
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
                 rospy.logwarn(str(e))
 
-            # Get Joint Positions
+    def send_command(self, F_command):
+        self.current_joint_positions = self.q
+        msg = JointState()
+        msg.header.stamp = rospy.get_rostime()
+        msg.header.frame_id = "simuated_data"
+        msg.name = self.JOINT_NAMES
+        msg.position = self.current_joint_positions
+        msg.velocity = [0]*6
+        msg.effort = [0]*6
+        self.joint_state_publisher.publish(msg)
 
-            # try:
-            #   F_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/endpoint',rospy.Time(0)))
-            #   rospy.logwarn(F_world.p)
-            #   rospy.logwarn(F_world.M.GetRPY())
-            # except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-            #     rospy.logwarn(str(e))
+        F = F_command
+        self.current_tcp_pose = tf_c.toMsg(F)
+        self.current_tcp_frame = F
+        self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
     def set_teach_mode_call(self,req):
         if self.driver_status == 'SERVO':
@@ -189,21 +165,18 @@ class URDriver():
         return 'SUCCESS - stopped robot'
 
     def servo_to_pose_call(self,req): 
-        if self.driver_status == 'SERVO':
-            T = tf_c.fromMsg(req.target)
-            a,axis = T.M.GetRotAngle()
-            pose = list(T.p) + [a*axis[0],a*axis[1],a*axis[2]]
-            # Check acceleration and velocity limits
-            if req.accel > self.MAX_ACC:
-                acceleration = self.MAX_ACC
+        if self.driver_status == 'SIMULATION':
+            rospy.logwarn(req)
+            F_command = tf_c.fromMsg(req.target)
+            M_command = tf_c.toMatrix(F_command)
+            # Calculate IK
+            joint_positions = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
+            if joint_positions is not None:
+                pose_sol = self.kdl_kin.forward(joint_positions) # should equal pose
+                self.q = joint_positions
             else:
-                acceleration = req.accel
-            if req.vel > self.MAX_VEL:
-                velocity = self.MAX_VEL
-            else:
-                velocity = req.vel
-            # Send command
-            self.rob.movel(pose,acc=acceleration,vel=velocity)
+                rospy.logwarn('no solution found')
+            self.send_command(F_command)
             return 'SUCCESS - moved to pose'
         else:
             rospy.logerr('SIMPLE UR -- Not in servo mode')
