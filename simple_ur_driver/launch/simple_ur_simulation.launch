@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simple_ur_driver)/ur.rviz" /> -->
+
+  <node name="simple_ur" pkg="simple_ur_driver" type="ur_simulation.py" output="screen"/>
+
+  <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -3.1415 0 -1.5707 /world /target_frame 10"/> -->
+  <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /target_frame 10"/>
+  
+  <node name="landmark_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".5 -.5 1.5 0 0 0 /world /test_landmark 10"/>
+  <!-- [WARN] [WallTime: 1414781484.721412] [    0.109118,   -0.422595,     1.34426] -->
+  <!-- [WARN] [WallTime: 1414781484.721725] (-3.141497317456638, 0.0008926497489398419, -1.5707952475803346) -->
+
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_base_link" args=" 0 0 1.4605 3.1415 0 -2.3565 /world /base_link 10"/>
+
+  <node pkg="tf" type="static_transform_publisher" name="ee_to_robotiq_c" args=" 0 0 0 0 0 0  /ee_link /robotiq_85_adapter_link 10"/>
+
+  <node pkg="tf" type="static_transform_publisher" name="ee_to_wrist_camera" args=" 0 0 -.045 0 0 0   /ee_link /camera_1_link 10"/>
+
+  <!-- robot_ip: IP-address of the robot's socket-messaging server -->
+  <arg name="robot_ip" />
+  <arg name="limited" default="false"/>
+
+  <!-- robot model -->
+  <include file="$(find ur_description)/launch/ur5_upload.launch">
+    <arg name="limited" value="$(arg limited)"/>
+  </include>
+
+  <group ns="/ur5/ghost">
+    <include file="$(find ur_description)/launch/ur5_upload.launch">
+      <arg name="limited" value="$(arg limited)"/>
+      <remap from="joint_states" to="/ur5/ghost/joint_states"/>
+    </include>
+  </group>
+
+  <!-- <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" > -->
+      <!-- <remap from="joint_states" to="/ur5/gripper/joint_states"/> -->
+  <!-- </node> -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" >
+    <!-- <remap from="joint_states" to="/ur5/gripper/joint_states"/> -->
+  </node>
+  
+  <!-- gripper model -->
+  <group ns="/ur5/gripper">
+    <arg name="model" default="$(find robotiq_c_model_visualization)/cfg/robotiq_c_model.urdf" />
+    <arg name="gui" default="False" />
+    <param name="robot_description" textfile="$(arg model)" />
+    <param name="use_gui" value="$(arg gui)"/>
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" >
+      <param name="rate" value="120.0" />
+      <remap from="joint_states" to="/ur5/gripper/joint_states"/>
+    </node>
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher">
+      <remap from="joint_states" to="/ur5/gripper/joint_states"/>
+    </node>
+    <rosparam>
+      source_list: [/ur5/gripper/joint_states]
+    </rosparam>
+  </group>
+  
+</launch>
