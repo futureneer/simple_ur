@@ -8,6 +8,8 @@
 
   <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -3.1415 0 -1.5707 /world /target_frame 10"/> -->
   <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /target_frame 10"/>
+  
+  <node name="landmark_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".5 -.5 1.5 0 0 0 /world /test_landmark 10"/>
   <!-- [WARN] [WallTime: 1414781484.721412] [    0.109118,   -0.422595,     1.34426] -->
   <!-- [WARN] [WallTime: 1414781484.721725] (-3.141497317456638, 0.0008926497489398419, -1.5707952475803346) -->
 

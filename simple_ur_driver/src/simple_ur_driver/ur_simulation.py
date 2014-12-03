@@ -11,6 +11,7 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 from simple_ur_msgs.srv import *
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
+from predicator_msgs.msg import *
 from std_msgs.msg import *
 import time
 import threading
@@ -44,9 +45,18 @@ class URDriver():
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         # self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
+        # Predicator
+        self.pub_list = rospy.Publisher('/predicator/input', PredicateList)
+        self.pub_valid = rospy.Publisher('/predicator/valid_input', ValidPredicates)
+        rospy.sleep(1)
+        pval = ValidPredicates()
+        pval.pheader.source = rospy.get_name()
+        pval.predicates = ['moving', 'stopped', 'running']
+        pval.assignments = ['robot']
+        self.pub_valid.publish(pval)
         # Rate
         self.run_rate = rospy.Rate(100)
-
+        self.run_rate.sleep()
         ### Set Up Simulated Robot ###
         self.driver_status = 'IDLE'
         self.robot_state = 'POWER OFF'
@@ -80,6 +90,7 @@ class URDriver():
 
             # Publish and Sleep
             self.publish_status()
+            self.send_command()
             self.run_rate.sleep()
 
         # Finish
@@ -90,8 +101,8 @@ class URDriver():
             F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/target_frame',rospy.Time(0)))
             F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/target_frame',rospy.Time(0)))
             F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
-            F_command = F_base_world.Inverse()*F_target_world
-            M_command = tf_c.toMatrix(F_command)
+            self.F_command = F_base_world.Inverse()*F_target_world
+            M_command = tf_c.toMatrix(self.F_command)
 
             joint_positions = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
             if joint_positions is not None:
@@ -100,12 +111,12 @@ class URDriver():
             else:
                 rospy.logwarn('no solution found')
 
-            self.send_command(F_command)
+            # self.send_command()
 
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
             rospy.logwarn(str(e))
 
-    def send_command(self, F_command):
+    def send_command(self):
         self.current_joint_positions = self.q
         msg = JointState()
         msg.header.stamp = rospy.get_rostime()
@@ -116,7 +127,9 @@ class URDriver():
         msg.effort = [0]*6
         self.joint_state_publisher.publish(msg)
 
-        F = F_command
+        pose = self.kdl_kin.forward(self.q)
+        F = tf_c.fromMatrix(pose)
+        # F = self.F_command
         self.current_tcp_pose = tf_c.toMsg(F)
         self.current_tcp_frame = F
         self.broadcaster_.sendTransform(tuple(F.p),tuple(F.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
@@ -147,8 +160,8 @@ class URDriver():
     def servo_to_pose_call(self,req): 
         if self.driver_status == 'SERVO':
             rospy.logwarn(req)
-            F_command = tf_c.fromMsg(req.target)
-            M_command = tf_c.toMatrix(F_command)
+            self.F_command = tf_c.fromMsg(req.target)
+            M_command = tf_c.toMatrix(self.F_command)
             # Calculate IK
             joint_positions = self.kdl_kin.inverse(M_command, self.q) # inverse kinematics
             if joint_positions is not None:
@@ -156,7 +169,7 @@ class URDriver():
                 self.q = joint_positions
             else:
                 rospy.logwarn('no solution found')
-            self.send_command(F_command)
+            # self.send_command(F_command)
             return 'SUCCESS - moved to pose'
         else:
             rospy.logerr('SIMPLE UR -- Not in servo mode')
@@ -165,6 +178,30 @@ class URDriver():
     def publish_status(self):
         self.driver_status_publisher.publish(String(self.driver_status))
         self.robot_state_publisher.publish(String(self.robot_state))
+
+        ps = PredicateList()
+        ps.pheader.source = rospy.get_name()
+        ps.statements = []
+
+        statement = PredicateStatement( predicate='moving',
+                                        confidence=1,
+                                        value=PredicateStatement.FALSE,
+                                        num_params=1,
+                                        params=['robot', '', ''])
+        ps.statements += [statement]
+        statement = PredicateStatement( predicate='stopped',
+                                        confidence=1,
+                                        value=PredicateStatement.TRUE,
+                                        num_params=1,
+                                        params=['robot', '', ''])
+        ps.statements += [statement]
+        statement = PredicateStatement( predicate='running',
+                                        confidence=1,
+                                        value=PredicateStatement.TRUE,
+                                        num_params=1,
+                                        params=['robot', '', ''])
+        ps.statements += [statement]
+        self.pub_list.publish(ps)
 
     def check_robot_state(self):
         self.robot_state == 'RUNNING SIMULATION'
