@@ -249,7 +249,7 @@ class URStatusPanel(Plugin):
         self._widget.msg_label.setText("SERVO DISABLED")
 
     def check_status(self):
-        rospy.logwarn(self.driver_status)
+        # rospy.logwarn(self.driver_status)
         
         if self.driver_status == 'IDLE':
             self._widget.mode_label.setText(str(self.driver_status))
