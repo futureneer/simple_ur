@@ -13,6 +13,7 @@
   <node pkg="tf" type="static_transform_publisher" name="ee_to_robotiq_c" args=" 0 0 0 0 0 0  /ee_link /robotiq_85_adapter_link 1000"/>
 
   <node pkg="tf" type="static_transform_publisher" name="ee_to_wrist_camera" args=" 0 0 -.045 0 0 0   /ee_link /camera_1_link 1000"/>
+  <!-- <node pkg="tf" type="static_transform_publisher" name="endpoint_to_marker" args=" 0 0 0 0 -1.5707 0   /endpoint /endpoint_marker 1000"/> -->
 
   <!-- robot_ip: IP-address of the robot's socket-messaging server -->
   <arg name="robot_ip" />

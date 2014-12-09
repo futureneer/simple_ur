@@ -8,6 +8,7 @@ import PyKDL
 from simple_ur_msgs.srv import *
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
+from predicator_msgs.msg import *
 from std_msgs.msg import *
 import time
 import threading
@@ -246,6 +247,17 @@ pidProg()
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
+
+        # PREDICATOR INTERFACE
+        self.pub_list = rospy.Publisher('/predicator/input', PredicateList)
+        self.pub_valid = rospy.Publisher('/predicator/valid_input', ValidPredicates)
+        rospy.sleep(.5)
+        pval = ValidPredicates()
+        pval.pheader.source = rospy.get_name()
+        pval.predicates = ['soft_force_exceeded', 'hard_force_exceeded']
+        pval.assignments = ['robot']
+        self.pub_valid.publish(pval)
+
         # Rate
         self.run_rate = rospy.Rate(30)
 
@@ -479,13 +491,41 @@ pidProg()
         self.driver_status_publisher.publish(String(self.driver_status))
         self.robot_state_publisher.publish(String(self.robot_state))
 
+        # Check Force
+        F = self.rob.get_tcp_force()
+        val_soft = PredicateStatement.FALSE
+        val_hard = PredicateStatement.FALSE
+        for f in F:
+          if abs(f) > 50:
+            rospy.logwarn('Force Exceed: [' +str(f)+']')
+            val_soft = PredicateStatement.TRUE
+          if abs(f) > 65:
+            rospy.logwarn('Force Exceed: [' +str(f)+']')
+            val_hard = PredicateStatement.TRUE
+
+        ps = PredicateList()
+        ps.pheader.source = rospy.get_name()
+        ps.statements = []
+
+        statement = PredicateStatement( predicate='soft_force_exceeded',
+                                        confidence=1,
+                                        value=val_soft,
+                                        num_params=1,
+                                        params=['robot', '', ''])
+        ps.statements += [statement]
+        statement = PredicateStatement( predicate='hard_force_exceeded',
+                                        confidence=1,
+                                        value=val_hard,
+                                        num_params=1,
+                                        params=['robot', '', ''])
+        ps.statements += [statement]
+        self.pub_list.publish(ps)
+
     def check_robot_state(self):
         mode = self.rob.get_all_data()['RobotModeData']
-        # rospy.logwarn(mode['robotMode'])
 
         if not mode['isPowerOnRobot']:
             self.robot_state = 'POWER OFF'
-            # rospy.logwarn(self.robot_state)
             return
 
         if mode['isEmergencyStopped']:
@@ -501,8 +541,6 @@ pidProg()
                 if all([self.driver_status != 'SERVO',self.driver_status != 'FOLLOW',self.driver_status != 'TEACH']):
                     self.robot_state = 'RUNNING IDLE'
                     self.driver_status = 'IDLE'
-
-        # rospy.logwarn(self.robot_state)
 
 
 if __name__ == "__main__":
