@@ -27,7 +27,7 @@ class URStatusPanel(Plugin):
         self._widget = QWidget()
 
         rospack = rospkg.RosPack()
-        ui_path = rospack.get_path('simple_ur_driver') + '/ui/ur_status.ui'
+        ui_path = rospack.get_path('simple_ur_driver') + '/ui/ur_status_slim.ui'
         uic.loadUi(ui_path, self._widget)
         self._widget.setObjectName('UR5StatusPanel')
         self._widget.setWindowTitle('UR5 Status Panel')
@@ -48,7 +48,7 @@ class URStatusPanel(Plugin):
         self._widget.freedrive_enable_btn.clicked.connect(self.freedrive_enable)
         self._widget.freedrive_disable_btn.clicked.connect(self.freedrive_disable)
         self._widget.servo_enable_btn.clicked.connect(self.servo_enable)
-        self._widget.servo_follow_btn.clicked.connect(self.servo_follow)
+        # self._widget.servo_follow_btn.clicked.connect(self.servo_follow)
         self._widget.servo_disable_btn.clicked.connect(self.servo_disable)
 
         self._widget.gripper_open_btn.clicked.connect(self.gripper_open)

@@ -234,6 +234,8 @@ pidProg()
     def __init__(self):
         rospy.init_node('ur_driver',anonymous=True)
         rospy.logwarn('SIMPLE_UR DRIVER LOADING')
+        # Set State First
+        self.robot_state = 'POWER OFF'
         # TF
         self.broadcaster_ = tf.TransformBroadcaster()
         self.listener_ = tf.TransformListener()
@@ -247,10 +249,11 @@ pidProg()
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
-
+        self.sound_pub = rospy.Publisher('/audri/sound/sound_player', String)
         # PREDICATOR INTERFACE
         self.pub_list = rospy.Publisher('/predicator/input', PredicateList)
         self.pub_valid = rospy.Publisher('/predicator/valid_input', ValidPredicates)
+        self.exceed_notify = False
         rospy.sleep(.5)
         pval = ValidPredicates()
         pval.pheader.source = rospy.get_name()
@@ -491,34 +494,44 @@ pidProg()
         self.driver_status_publisher.publish(String(self.driver_status))
         self.robot_state_publisher.publish(String(self.robot_state))
 
+
         # Check Force
         F = self.rob.get_tcp_force()
-        val_soft = PredicateStatement.FALSE
-        val_hard = PredicateStatement.FALSE
+        val_soft = False
+        val_hard = False
         for f in F:
-          if abs(f) > 50:
-            rospy.logwarn('Force Exceed: [' +str(f)+']')
-            val_soft = PredicateStatement.TRUE
-          if abs(f) > 65:
-            rospy.logwarn('Force Exceed: [' +str(f)+']')
-            val_hard = PredicateStatement.TRUE
+          if abs(f) >= 36 and abs(f) < 65:
+            rospy.logwarn('Soft Force Exceed: [' +str(f)+']')
+            if self.exceed_notify == False:
+              self.sound_pub.publish(String("ping_2"))
+              self.exceed_notify = True
+            val_soft = True
+            break
+          elif abs(f) >= 65:
+            rospy.logwarn('Hard Force Exceed: [' +str(f)+']')
+            val_hard = True
+            break
+          else:
+            self.exceed_notify = False
 
         ps = PredicateList()
         ps.pheader.source = rospy.get_name()
         ps.statements = []
 
-        statement = PredicateStatement( predicate='soft_force_exceeded',
-                                        confidence=1,
-                                        value=val_soft,
-                                        num_params=1,
-                                        params=['robot', '', ''])
-        ps.statements += [statement]
-        statement = PredicateStatement( predicate='hard_force_exceeded',
-                                        confidence=1,
-                                        value=val_hard,
-                                        num_params=1,
-                                        params=['robot', '', ''])
-        ps.statements += [statement]
+        if val_soft:
+          statement = PredicateStatement( predicate='soft_force_exceeded',
+                                          confidence=1,
+                                          value=True,
+                                          num_params=1,
+                                          params=['robot', '', ''])
+          ps.statements += [statement]
+        if val_hard:
+          statement = PredicateStatement( predicate='hard_force_exceeded',
+                                          confidence=1,
+                                          value=True,
+                                          num_params=1,
+                                          params=['robot', '', ''])
+          ps.statements += [statement]
         self.pub_list.publish(ps)
 
     def check_robot_state(self):
