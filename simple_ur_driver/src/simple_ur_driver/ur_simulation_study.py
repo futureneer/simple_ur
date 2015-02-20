@@ -63,7 +63,7 @@ class URDriver():
         robot = URDF.from_parameter_server()
         self.kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
         # self.q = self.kdl_kin.random_joint_angles()
-        self.q = [-1.5707,-.785,-3.1415+.785,-1.5707-.785,-1.5707,0] # Start Pose?
+        self.q = [-1.5707,-1.5707,-3.1415+.785,-1.5707-.785,-1.5707,0] # Start Pose?
         self.start_pose = self.kdl_kin.forward(self.q)
         self.F_start = tf_c.fromMatrix(self.start_pose)
         # rospy.logwarn(self.start_pose)

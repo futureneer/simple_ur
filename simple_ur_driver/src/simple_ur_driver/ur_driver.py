@@ -499,6 +499,8 @@ pidProg()
         F = self.rob.get_tcp_force()
         val_soft = False
         val_hard = False
+        # print F[0]
+        
         for f in F:
           if abs(f) >= 36 and abs(f) < 65:
             rospy.logwarn('Soft Force Exceed: [' +str(f)+']')

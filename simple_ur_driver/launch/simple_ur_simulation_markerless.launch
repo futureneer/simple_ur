@@ -3,22 +3,20 @@
 <launch>
 
   <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simple_ur_driver)/ur.rviz" /> -->
-
-  <node name="simple_ur" pkg="simple_ur_driver" type="ur_simulation.py" output="screen"/>
-
+  <node name="simple_ur" pkg="simple_ur_driver" type="ur_simulation_study.py" output="screen"/>
   <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -3.1415 0 -1.5707 /world /target_frame 10"/> -->
-  <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /endpoint_interact 10"/>
+  <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /endpoint_interact 10"/> -->
   
-  <node name="landmark_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".5 -.5 1.5 0 0 0 /world /test_landmark 10"/>
-  <!-- [WARN] [WallTime: 1414781484.721412] [    0.109118,   -0.422595,     1.34426] -->
-  <!-- [WARN] [WallTime: 1414781484.721725] (-3.141497317456638, 0.0008926497489398419, -1.5707952475803346) -->
-
-
-  <node pkg="tf" type="static_transform_publisher" name="world_to_base_link" args=" 0 0 1.4605 3.1415 0 -2.3565 /world /base_link 10"/>
+  <!-- <node name="landmark_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".5 -.5 1.5 0 0 0 /world /test_landmark 10"/> -->
+  
+  <!-- -45 Degrees -->
+  <!-- <node pkg="tf" type="static_transform_publisher" name="world_to_base_link" args=" 0 0 1.4605 3.1415 0 -2.3565 /world /base_link 10"/> -->
+  <!-- 0 Degrees -->
+  <node pkg="tf" type="static_transform_publisher" name="world_to_base_link" args=" 0 0 1.4605 3.1415 0 -3.14159 /world /base_link 10"/>
 
   <node pkg="tf" type="static_transform_publisher" name="ee_to_robotiq_c" args=" 0 0 0 0 0 0  /ee_link /robotiq_85_adapter_link 10"/>
-
   <node pkg="tf" type="static_transform_publisher" name="ee_to_wrist_camera" args=" 0 0 -.045 0 0 0   /ee_link /camera_1_link 10"/>
+  <node pkg="tf" type="static_transform_publisher" name="endpoint_to_task" args=" .13 0 -.02 0 0 0 /endpoint /task_frame 10"/>
 
   <!-- robot_ip: IP-address of the robot's socket-messaging server -->
   <arg name="robot_ip" />
