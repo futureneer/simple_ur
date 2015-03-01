@@ -1,0 +1,136 @@
+
+#!/usr/bin/env python
+import rospy
+import numpy as np
+from copy import deepcopy
+import urx
+import logging
+import socket
+import struct 
+
+class PID:
+    """
+    Discrete PID control
+    """
+
+    def __init__(self, P=2.0, I=0.0, D=1.0, Derivator=0, Integrator=0, Integrator_max=500, Integrator_min=-500):
+
+        self.Kp=P
+        self.Ki=I
+        self.Kd=D
+        self.Derivator=Derivator
+        self.Integrator=Integrator
+        self.Integrator_max=Integrator_max
+        self.Integrator_min=Integrator_min
+
+        self.set_point=0.0
+        self.error=0.0
+
+    def update(self,current_value):
+        """
+        Calculate PID output value for given reference input and feedback
+        """
+
+        self.error = self.set_point - current_value
+
+        self.P_value = self.Kp * self.error
+        self.D_value = self.Kd * ( self.error - self.Derivator)
+        self.Derivator = self.error
+
+        self.Integrator = self.Integrator + self.error
+
+        if self.Integrator > self.Integrator_max:
+            self.Integrator = self.Integrator_max
+        elif self.Integrator < self.Integrator_min:
+            self.Integrator = self.Integrator_min
+
+        self.I_value = self.Integrator * self.Ki
+
+        PID = self.P_value + self.I_value + self.D_value
+
+        return PID
+
+    def setPoint(self,set_point):
+        """
+        Initilize the setpoint of PID
+        """
+        self.set_point = set_point
+        self.Integrator=0
+        self.Derivator=0
+
+    def setIntegrator(self, Integrator):
+        self.Integrator = Integrator
+
+    def setDerivator(self, Derivator):
+        self.Derivator = Derivator
+
+    def setKp(self,P):
+        self.Kp=P
+
+    def setKi(self,I):
+        self.Ki=I
+
+    def setKd(self,D):
+        self.Kd=D
+
+    def getPoint(self):
+        return self.set_point
+
+    def getError(self):
+        return self.error
+
+    def getIntegrator(self):
+        return self.Integrator
+
+    def getDerivator(self):
+        return self.Derivator
+
+def check_distance(a,b,val):
+    ''' returns true if distance is SMALLER than val'''
+    v1 = np.array(a)
+    v2 = np.array(b)
+    res = np.sum(np.abs(np.subtract(v1,v2)))
+    # rospy.logwarn(res)
+    if res < val:
+        return True
+    else:
+        return False
+
+if __name__ == "__main__":
+
+
+    rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
+    print 'connected to robot'
+    sock = socket.create_connection(('192.168.1.155', 30003), timeout=0.005)
+    print 'created socket'
+    if rob:
+        realtime_monitor = rob.get_realtime_monitor()
+        print 'created realtime monitor connection'
+
+
+    # rob.set_tcp((0,0,0,0,0,0))
+    # rob.set_payload(0.5, (0,0,0))
+
+
+    rospy.sleep(1)
+
+    for n in range(100):
+        vels = [0.0, 0.0, -0.2, 0.0, 0.0, 0.0]
+        acc = .05
+        vels.append(acc)
+        timeout = .008
+        vels.append(timeout)
+        prog = "speedl([{},{},{},{},{},{}], a={}, t_min={})\n".format(*vels)
+        # prog = "textmsg({})\n".format(n)
+        if type(prog) != bytes:
+            prog = prog.encode()
+        print 'sending command ('+str(n)+') ['+str(prog)+']'
+        sock.send(prog)
+        rospy.sleep(.007)
+        tcp_data = realtime_monitor.get_all_data()['tcp']
+        # print [float(t) for t in tcp_data]
+        print float(tcp_data[2])
+
+    rospy.sleep(1)
+    sock.close() 
+    rob.cleanup()
