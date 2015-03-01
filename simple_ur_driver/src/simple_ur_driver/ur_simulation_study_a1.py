@@ -23,6 +23,9 @@ import logging
 import numpy as np
 from pid import PID
 
+def tr(deg):
+    return deg*3.314159265/180.0
+
 class URDriver():
     MAX_ACC = .5
     MAX_VEL = 1.8
@@ -58,12 +61,13 @@ class URDriver():
         self.run_rate = rospy.Rate(100)
         self.run_rate.sleep()
         ### Set Up Simulated Robot ###
-        self.driver_status = 'IDLE'
+        self.driver_status = 'TEACH'
         self.robot_state = 'POWER OFF'
         robot = URDF.from_parameter_server()
         self.kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
         # self.q = self.kdl_kin.random_joint_angles()
-        self.q = [-1.5707,-1.396,-2.356,-2.356,-1.5707,0] # Start Pose?
+        # self.q = [-1.5707,-1.396,-2.356,-2.356,-1.5707,0] # Start Pose?
+        self.q = [-2.2498339,  -2.29111219, -0.76558778, -3.22116269, -2.3579881,  -0.05971889] # Start Pose?
         self.start_pose = self.kdl_kin.forward(self.q)
         self.F_start = tf_c.fromMatrix(self.start_pose)
         # rospy.logwarn(self.start_pose)
@@ -117,6 +121,7 @@ class URDriver():
             rospy.logwarn(str(e))
 
     def send_command(self):
+        # rospy.logwarn(self.q)
         self.current_joint_positions = self.q
         msg = JointState()
         msg.header.stamp = rospy.get_rostime()

@@ -58,7 +58,7 @@ class URDriver():
         self.run_rate = rospy.Rate(100)
         self.run_rate.sleep()
         ### Set Up Simulated Robot ###
-        self.driver_status = 'IDLE'
+        self.driver_status = 'TEACH'
         self.robot_state = 'POWER OFF'
         robot = URDF.from_parameter_server()
         self.kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
