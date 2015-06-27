@@ -5,7 +5,7 @@
   <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simple_ur_driver)/ur.rviz" /> -->
   <node name="simple_ur" pkg="simple_ur_driver" type="ur_simulation_study_a1.py" output="screen"/>
   <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -3.1415 0 -1.5707 /world /target_frame 10"/> -->
-  <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /endpoint_interact 10"/> -->
+  <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /endpoint_interact 10"/>
   
   <!-- <node name="landmark_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".5 -.5 1.5 0 0 0 /world /test_landmark 10"/> -->
   
