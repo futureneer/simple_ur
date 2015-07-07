@@ -8,7 +8,7 @@
 
   <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args="-.109 -.72 1.47 3.1415 0 -1.5707 /world /target_frame 1000"/> -->
 
-  <node pkg="tf" type="static_transform_publisher" name="world_to_base_link" args=" 0 0 1.4605 3.1415 0 -3.1415 /world /base_link 1000"/>
+  <node pkg="tf" type="static_transform_publisher" name="world_to_base_link" args=" 0 0 0 0 0 0 /world /base_link 1000"/>
 
   <node pkg="tf" type="static_transform_publisher" name="ee_to_robotiq_c" args=" 0 0 0 0 0 0  /ee_link /robotiq_85_adapter_link 1000"/>
 

@@ -8,7 +8,7 @@
 
   <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args="-.109 -.72 1.47 3.1415 0 -1.5707 /world /target_frame 1000"/> -->
 
-  <node pkg="tf" type="static_transform_publisher" name="world_to_base_align" args=" 0 0 1.4605 0 0 2.35605 /world /base_align 100"/>
+  <node pkg="tf" type="static_transform_publisher" name="world_to_base_align" args=" 0 0 1.613 0 0 2.35605 /world /base_align 100"/>
 
   <node pkg="tf" type="static_transform_publisher" name="align_to_base_link" args=" 0 0 0 .7853 0 0 /base_align /base_link 100"/>
 
