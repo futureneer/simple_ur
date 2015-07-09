@@ -17,8 +17,37 @@ import socket
 import urx
 # OTHER
 import logging
+from threading import Thread
 import numpy as np
+# CONTROL
 from pid import PID
+# ROBOT KINEMATICS
+from urdf_parser_py.urdf import URDF
+from pykdl_utils.kdl_kinematics import KDLKinematics
+
+''' ========================== UTILITIES =========================='''
+'''
+These helper functions are to make sure the robot stops when it is supposed to.
+'''
+def check_zero(v):
+  for vv in v:
+    if abs(vv) > .0001:
+      return False
+  return True 
+
+
+def check_stop(V):
+  for v in V:
+    if abs(v) < .0001:
+      v = 0
+  return V 
+
+def add_vectors(a,b):
+  v = []
+  for aa,bb in zip(a,b):
+    v.append(aa + bb)
+  return v
+''' ========================== END UTILITIES =========================='''
 
 class URDriver():
     MAX_ACC = .5
@@ -32,35 +61,28 @@ class URDriver():
     MULT_time = 1000000.0
     MULT_blend = 1000.0
     
-    PID_PROG = '''def jointPD():
-#JOINTPD
-# The function listens for position commands to control the joint angles using PD control
-  #ADDRESS = "${HOSTNAME}"
-  #PORT = ${HOSTPORT}
+    # PROG FILE
+    PID_PROG = '''######################################################################
+def pidProg():
+  textmsg("Velocity Follow Program Started")
+  MSG_QUIT = 3
+  MSG_TEST = 4
+  MSG_SETPOINT = 5
   Socket_Closed = True
-  #socket_open("192.168.1.5", 30000)
-  #textmsg("Socket Open on Robot")
 
-  kp = 0.35
-  kd = 0.03
-
-  tol = 0.0001 # radians
-  qdes = [0,0,0,0,0,0] # desired position
-  qdot = [0,0,0,0,0,0] # joint velocity
-  err = [0,0,0,0,0,0] # joint error
-  perr = [0,0,0,0,0,0] # previous error
-  derr1 = [0,0,0,0,0,0] # joint error - previous error
-  derr2 = [0,0,0,0,0,0] # derr1 from last step
-
+  ## SET UP ####################################################################
+  xd = [0,0,0,0,0,0]
   thread move():
     while True:
-      speedj(qdot, 1.0, 0)
+      speedj(xd, 1.0, 0)
     end
   end
 
   thrd = run move()
 
+  ## MAIN LOOP #################################################################
   while (True):
+    ### OPEN SOCKET ###
     if (Socket_Closed == True):
       # Keep Checking socket to see if opening it failed
       r = socket_open("192.168.1.5", 30000)
@@ -71,41 +93,30 @@ class URDriver():
       end
     end
 
-    val = socket_read_ascii_float(6)
-    if val[0] < 6:
-      if val[0] == 3:
+    ### READ DATA ###
+    data = socket_read_ascii_float(6)
+    if data[0] == 1:
+      textmsg("Got Command")
+      if data[1] == MSG_QUIT:
         textmsg("Recieved Quit Command ... DONE")
-        stopj(1.0)
         break
-      #qdes = [0,0,0,0,0,0]    
-      #stopj(1.0)
-    else:
-      qdes = [val[1],
-             val[2],
-       val[3],
-       val[4],
-       val[5],
-       val[6]]
-    end
-    qcurr = get_actual_joint_positions()
-    i = 0
-    while i < 6:
-      derr2[i] = derr1[i]      
-      err[i] = qdes[i] - qcurr[i]
-      derr1[i] = err[i] - perr[i]
-      perr[i] = err[i]
-
-      qdot[i] = kp*err[i] + kd*derr1[i]
-      if (err[i] < tol) and (err[i] > -tol):
-        qdot[i] = 0.0
+      elif data[1] == MSG_TEST:
+        textmsg("Recieved Test Message")
       end
-
-      i = i+1
+    elif data[0] == 6:
+      textmsg(data)
+      xd = [data[1],data[2],data[3],data[4],data[5],data[6]]
     end
+
   end
+  
+  ### FINISH ###
   kill thrd
   socket_close()
+  textmsg("Finished")
+
 end
+pidProg()
 '''
 
     def __init__(self):
@@ -125,7 +136,8 @@ end
         self.driver_status_publisher = rospy.Publisher('/ur_robot/driver_status',String)
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
-        self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
+        self.set_point_publisher = rospy.Publisher('joint_states_goal',JointState)
+        #self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
         self.sound_pub = rospy.Publisher('/audri/sound/sound_player', String)
         # PREDICATOR INTERFACE
         self.pub_list = rospy.Publisher('/predicator/input', PredicateList)
@@ -141,8 +153,11 @@ end
         # Rate
         self.run_rate = rospy.Rate(30)
 
+
         ### Set Up Robot ###
+        robot = URDF.from_parameter_server()
         self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
+        self.kdl_kin = KDLKinematics(robot, 'base_link', 'ee_link')
         if not self.rob:
             rospy.logwarn('SIMPLE UR  - ROBOT NOT CONNECTED')
             self.driver_status = 'DISCONNECTED'
@@ -162,19 +177,29 @@ end
         self.follow_socket = None
         self.follow_sock_handle = None
 
-        ### START LOOP ###
-        while not rospy.is_shutdown():
-            # msg = struct.pack("!i", 10000)
-            # self.rt_socket.send(msg)
+        ### Set up individual PIDs with gains ###
+        self.pid = []
+        self.pid.append(PID(1,0,.01))
+        self.pid.append(PID(1,0,.025))
+        self.pid.append(PID(1,0,.05))
+        self.pid.append(PID(1,0,.1))
+        self.pid.append(PID(1,0,.1))
+        self.pid.append(PID(1,0,.1))
 
-            self.update()
-            self.check_driver_status()
-            self.check_robot_state()
-            self.publish_status()
-            if self.driver_status == 'FOLLOW':
-                self.update_follow()
-            # Sleep between commands to robot
+        self.current_joint_positions = self.rob.getj()
+        self.set_point = self.current_joint_positions
+        for i in range(6):
+            self.pid[i].setPoint(self.set_point[i])
+
+        ### START LOOP ###
+        print 'Starting main loop...'
+        self.update_thread = Thread(target=self.update_thread,args=())
+        self.update_thread.start()
+        print 'Updating control...'
+        while not rospy.is_shutdown():
+            self.follow_goal_update()
             self.run_rate.sleep()
+        self.update_thread.join()
 
         # Finish
         if self.driver_status == 'FOLLOW':
@@ -187,10 +212,25 @@ end
         # self.rt_socket.close()
         rospy.logwarn('SIMPLE UR - Real Time <WRITE> Socket Closed')
 
+    def update_thread(self):
+        rospy.loginfo("Started main update loop successfully!")
+        while not rospy.is_shutdown():
+            # msg = struct.pack("!i", 10000)
+            # self.rt_socket.send(msg)
+
+            self.update()
+            self.check_driver_status()
+            self.check_robot_state()
+            self.publish_status()
+            if  self.driver_status == 'FOLLOW':
+                self.update_follow()
+            # Sleep between commands to robot
+            self.run_rate.sleep()
+
     def reset_follow_goal(self):
         rospy.logwarn('RESET FOLLOW GOAL')
         self.follow_goal_axis_angle = self.current_axis_angle = self.rtm.get_all_data(wait=False)['tcp']
-        
+
     def update(self):
         if not self.driver_status == 'DISCONNECTED':
             # Get Joint Positions
@@ -204,6 +244,16 @@ end
             msg.effort = [0]*6
             self.joint_state_publisher.publish(msg)
             
+            # create a message about current set point if it exists
+            msg = JointState()
+            msg.header.stamp = rospy.get_rostime()
+            msg.header.frame_id = "user_set_point"
+            msg.name = self.JOINT_NAMES
+            msg.position = self.set_point
+            msg.velocity = [0]*6
+            msg.effort = [0]*6
+            self.set_point_publisher.publish(msg)
+
             # Get TCP Position
             tcp_angle_axis = self.rob.getl()
             # Create Frame from XYZ and Angle Axis
@@ -220,9 +270,25 @@ end
             self.broadcaster_.sendTransform(tuple(T.p),tuple(T.M.GetQuaternion()),rospy.Time.now(), '/endpoint','/base_link')
 
     def update_follow(self):
-        if self.follow_goal_axis_angle != None:
-            if self.follow_sock_handle != None:
-                self.follow_sock_handle.send("({},{},{},{},{},{})".format(*self.follow_goal_axis_angle))
+        print "SERVO TO POINT ({},{},{},{},{},{})".format(*self.set_point)
+        current_pose = self.rob.getj()
+        
+        command = [0,0,0,0,0,0]
+        for i in range(6):
+            command[i] = self.pid[i].update(current_pose[i])
+
+            # command[2] = pid[2].update(current_pose[2])
+
+        command_to_send = check_stop(command)
+        print command_to_send
+
+        self.follow_sock_handle.send("({},{},{},{},{},{})".format(*command_to_send))
+        self.run_rate.sleep()
+        self.stopped = check_zero(command_to_send)
+
+        #if self.follow_goal_axis_angle != None:
+        #    if self.follow_sock_handle != None:
+        #        self.follow_sock_handle.send("({},{},{},{},{},{})".format(*self.follow_goal_axis_angle))
 
     def start_follow(self):
         rospy.logwarn('Starting follow mode')
@@ -266,19 +332,47 @@ end
         else:
             rospy.logwarn("Handle Not Found")
 
-    def follow_goal_cb(self,msg):
-        if self.driver_status == 'FOLLOW':
-            # Set follow goal pose as axis-angle
-            F_goal = tf_c.fromMsg(msg.pose)
-            a,axis = F_goal.M.GetRotAngle()
-            with self.pid_lock:
-                self.follow_goal_axis_angle = list(F_goal.p) + [a*axis[0],a*axis[1],a*axis[2]]
+    '''
+    follow_goal_cb
+    Checks to find position of interactive marker relative to the robot.
+    Solves the inverse kinematics via KDL and sets a new PID control point.
+    '''
+    def follow_goal_update(self):
+        if True: #self.driver_status == 'FOLLOW':
+            ## Set follow goal pose as axis-angle
+            #F_goal = tf_c.fromMsg(msg.pose)
+            #a,axis = F_goal.M.GetRotAngle()
+            #with self.pid_lock:
+            #    self.follow_goal_axis_angle = list(F_goal.p) + [a*axis[0],a*axis[1],a*axis[2]]
             # Broadcast goal for debugging purposes
-            self.broadcaster_.sendTransform(tuple(F_goal.p),tuple(F_goal.M.GetQuaternion()),rospy.Time.now(), '/ur_goal','/base_link')
-            # Set goal pose as PID set point
-            # with self.pid_lock:
-            #     for pid, g in zip(self._pid, self.follow_goal_axis_angle):
-            #         pid.setPoint(g)
+            #self.broadcaster_.sendTransform(tuple(F_goal.p),tuple(F_goal.M.GetQuaternion()),rospy.Time.now(), '/ur_goal','/base_link')
+            ## Set goal pose as PID set point
+            ## with self.pid_lock:
+            ##     for pid, g in zip(self._pid, self.follow_goal_axis_angle):
+            ##         pid.setPoint(g)
+            try:
+                F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/endpoint_interact',rospy.Time(0)))
+                F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/endpoint_interact',rospy.Time(0)))
+                F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
+                self.F_command = F_base_world.Inverse()*F_target_world
+                M_command = tf_c.toMatrix(self.F_command)
+
+                joint_positions = self.kdl_kin.inverse(M_command, self.current_joint_positions) # inverse kinematics
+                if joint_positions is not None:
+                    pose_sol = self.kdl_kin.forward(joint_positions) # should equal pose
+                    self.set_point = joint_positions
+                    for i in range(6):
+                        self.pid[i].setPoint(self.set_point[i])
+                else:
+                    rospy.logwarn('no solution found')
+
+                # self.send_command()
+
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+                rospy.logwarn(str(e))
+
+            #for i in range(6):
+            #    self.pid[i].setPoint(self.rob.getj()[i]);
         else:
             rospy.logerr("FOLLOW NOT ENABLED!")
 
@@ -439,4 +533,7 @@ end
 
 
 if __name__ == "__main__":
-    robot_driver = URDriver()
+    try:
+        robot_driver = URDriver()
+    except rospy.ROSInterruptException():
+        pass
