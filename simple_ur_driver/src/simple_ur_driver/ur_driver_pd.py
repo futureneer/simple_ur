@@ -354,7 +354,12 @@ pidProg()
                 F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/endpoint_interact',rospy.Time(0)))
                 F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/endpoint_interact',rospy.Time(0)))
                 F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
+                F_ee_endpoint = tf_c.fromTf(self.listener_.lookupTransform('/ee_link','/endpoint',rospy.Time(0)))
+                
                 self.F_command = F_base_world.Inverse()*F_target_world
+
+                self.broadcaster_.sendTransform(tuple(self.F_command.p),tuple(self.F_command.M.GetQuaternion()),rospy.Time.now(), '/goal','/base_link')
+
                 M_command = tf_c.toMatrix(self.F_command)
 
                 joint_positions = self.kdl_kin.inverse(M_command, self.current_joint_positions) # inverse kinematics
@@ -373,8 +378,8 @@ pidProg()
 
             #for i in range(6):
             #    self.pid[i].setPoint(self.rob.getj()[i]);
-        else:
-            rospy.logerr("FOLLOW NOT ENABLED!")
+        #else:
+        #    rospy.logerr("FOLLOW NOT ENABLED!")
 
 
     def reached_goal(self,a,b,val):

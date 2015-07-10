@@ -7,7 +7,7 @@
   <node name="simple_ur" pkg="simple_ur_driver" type="ur_driver_pd.py" output="screen"/>
 
   <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args="-.109 -.72 1.47 3.1415 0 -1.5707 /world /target_frame 1000"/> -->
-  <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /endpoint_interact 10"/>
+  <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args=".10915 -.4225 1.344 -1.5707 0 0 /world /endpoint_interact 10"/> -->
 
   <node pkg="tf" type="static_transform_publisher" name="world_to_base_align" args=" 0 0 1.4605 0 0 2.35605 /world /base_align 100"/>
 
