@@ -27,7 +27,7 @@ class Force():
 
         self.initialized = False
 
-
+        rospy.sleep(1)
 
         self.zero_sensor()
 
@@ -46,10 +46,8 @@ class Force():
         F = [msg.Fx, msg.Fy, msg.Fz]
         filtered_F = [0,0,0]
         for i in range(3):
-            if abs(F[i]) > 4:
+            if abs(F[i]) > 6:
                 filtered_F[i] = F[i]
-        p = self.F_endpoint_target.p
-        p = PyKDL.Vector(p.x() - filtered_F[0]*.00005 , p.y()- filtered_F[2]*.00005, p.z()- filtered_F[1]*.00005)
         
         M = [msg.Mx, msg.My, msg.Mz]
         filtered_M = [0,0,0]
@@ -57,9 +55,16 @@ class Force():
             if abs(M[i]) > .2:
                 filtered_M[i] = M[i]
 
-        R = self.F_endpoint_target.M.GetRPY()
-        M = PyKDL.Rotation.RPY(R[0] + filtered_M[2]*.0035 , R[1] - filtered_M[0]*.0035, R[2] - filtered_M[1]*.0035)
+        self.F_orient = tf_c.fromTf(self.listener_.lookupTransform('/world','/ee_link',rospy.Time(0)))
 
+        R = self.F_endpoint_target.M.GetRPY()
+        M = PyKDL.Rotation.RPY(R[0] + filtered_M[2]*.005 , R[1] - filtered_M[0]*.005, R[2] - filtered_M[1]*.005)
+        
+        filtered_F = self.F_orient.M*PyKDL.Vector(-filtered_F[2],filtered_F[1],-filtered_F[0])
+
+        
+        p = self.F_endpoint_target.p
+        p = PyKDL.Vector(p.x() - filtered_F[0]*.00005 , p.y()- filtered_F[1]*.00005, p.z()- filtered_F[2]*.00005)
         
 
         self.F_endpoint_target.p = p
