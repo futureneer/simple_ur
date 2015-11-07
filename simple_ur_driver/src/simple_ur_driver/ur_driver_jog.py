@@ -249,6 +249,7 @@ pidProg()
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
+        self.jog_pose_subscriber = rospy.Subscriber('/ur_robot/jog',PoseStamped,self.jog)
         self.sound_pub = rospy.Publisher('/audri/sound/sound_player', String)
         # PREDICATOR INTERFACE
         self.pub_list = rospy.Publisher('/predicator/input', PredicateList)
@@ -468,6 +469,26 @@ pidProg()
         rospy.logwarn('SIMPLE UR - STOPPING ROBOT')
         self.rob.stopl()
         return 'SUCCESS - stopped robot'
+
+    def jog(self,msg):
+        rospy.logwarn("GOT JOG MSG")
+        rospy.logwarn(msg)
+        if self.driver_status == 'IDLE': 
+            F_current = self.current_tcp_frame
+            xyz_current = F_current.p
+            rpy_current = F_current.M.GetRPY()
+
+            F_offset = tf_c.fromMsg(msg.pose)
+            xyz_offset = F_offset.p
+            rpy_offset = F_offset.M.GetRPY()
+
+            F_command = PyKDL.Frame()
+            F_command.p = xyz_offset+xyz_current
+            F_command.M = PyKDL.Rotation.RPY(rpy_current[0]+rpy_offset[0],rpy_current[1]+rpy_offset[1],rpy_current[2]+rpy_offset[2])
+
+            a,axis = F_command.M.GetRotAngle()
+            pose = list(F_command.p) + [a*axis[0],a*axis[1],a*axis[2]]
+            self.rob.movel(pose,self.MAX_ACC,self.MAX_VEL)
 
     def servo_to_pose_call(self,req): 
         if self.driver_status == 'SERVO':

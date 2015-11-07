@@ -4,7 +4,7 @@
 
   <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simple_ur_driver)/ur.rviz" /> -->
 
-  <node name="simple_ur" pkg="simple_ur_driver" type="ur_driver.py" output="screen"/>
+  <node name="simple_ur" pkg="simple_ur_driver" type="ur_driver_jog.py" output="screen"/>
 
   <!-- <node name="target_frame_broadcaster" pkg="lcsr_tf_tools" type="interactive_transform_publisher" args="-.109 -.72 1.47 3.1415 0 -1.5707 /world /target_frame 1000"/> -->
 

@@ -8,6 +8,7 @@ import PyKDL
 from simple_ur_msgs.srv import *
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
+from trajectory_msgs.msg import JointTrajectoryPoint
 from predicator_msgs.msg import *
 from std_msgs.msg import *
 import time
@@ -85,7 +86,7 @@ def pidProg():
     ### OPEN SOCKET ###
     if (Socket_Closed == True):
       # Keep Checking socket to see if opening it failed
-      r = socket_open("192.168.1.5", 30000)
+      r = socket_open("192.168.1.5", 30001)
       if r == True:
         global Socket_Closed = False 
       else:
@@ -137,7 +138,8 @@ pidProg()
         self.robot_state_publisher = rospy.Publisher('/ur_robot/robot_state',String)
         self.joint_state_publisher = rospy.Publisher('joint_states',JointState)
         self.set_point_publisher = rospy.Publisher('joint_states_goal',JointState)
-        #self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
+        self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_goal',PoseStamped,self.follow_goal_cb)
+        self.follow_pose_subscriber = rospy.Subscriber('/ur_robot/follow_joint_goal',JointTrajectoryPoint,self.follow_joint_goal_cb)
         self.sound_pub = rospy.Publisher('/audri/sound/sound_player', String)
         # PREDICATOR INTERFACE
         self.pub_list = rospy.Publisher('/predicator/input', PredicateList)
@@ -197,7 +199,7 @@ pidProg()
         self.update_thread.start()
         print 'Updating control...'
         while not rospy.is_shutdown():
-            self.follow_goal_update()
+            #self.follow_goal_update()
             self.run_rate.sleep()
         self.update_thread.join()
 
@@ -224,6 +226,10 @@ pidProg()
             self.publish_status()
             if  self.driver_status == 'FOLLOW':
                 self.update_follow()
+	    else:
+	        self.set_point = self.current_joint_positions
+                for i in range(6):
+                    self.pid[i].setPoint(self.set_point[i])
             # Sleep between commands to robot
             self.run_rate.sleep()
 
@@ -293,7 +299,7 @@ pidProg()
     def start_follow(self):
         rospy.logwarn('Starting follow mode')
         self.follow_host = "192.168.1.5"      # The remote host
-        self.follow_port = 30000                # The same port as used by the server
+        self.follow_port = 30001                # The same port as used by the server
         rospy.loginfo('Sending follow program')
         # self.rob.send_program(self.PID_PROG,direct=True)
         self.rob.send_program(self.PID_PROG)
@@ -315,48 +321,57 @@ pidProg()
     def stop_follow(self):
         rospy.logwarn('Stopping follow mode')
         if self.follow_sock_handle != None:
-            rospy.loginfo('Sending Program Close Command')
-            self.follow_sock_handle.send("(3)")
-            rospy.sleep(.01)
-            self.follow_sock_handle.send("(3)")
-            rospy.sleep(.01)
-            self.follow_sock_handle.send("(3)")
-            rospy.sleep(.01)
-            self.follow_sock_handle.send("(3)")
-            rospy.sleep(.01)
-            rospy.loginfo('Cleaning Up Follow Sockets')
-            self.follow_sock_handle.close()
-            self.follow_socket.close()
+            try:
+		    rospy.loginfo('Sending Program Close Command')
+		    self.follow_sock_handle.send("(3)")
+		    rospy.sleep(.01)
+		    self.follow_sock_handle.send("(3)")
+		    rospy.sleep(.01)
+		    self.follow_sock_handle.send("(3)")
+		    rospy.sleep(.01)
+		    self.follow_sock_handle.send("(3)")
+		    rospy.sleep(.01)
+		    rospy.loginfo('Cleaning Up Follow Sockets')
+		    self.follow_sock_handle.close()
+		    self.follow_socket.close()
+            except socket.error, msg:
+		    rospy.loginfo(msg)
             self.follow_socket = None
             self.follow_sock_handle = None
         else:
             rospy.logwarn("Handle Not Found")
 
     '''
+    follow_joint_goal_cb
+    really simple: set PID control to joint position
+    '''
+    def follow_joint_goal_cb(self,msg):
+        if self.driver_status == 'FOLLOW':
+	    print msg
+	    self.set_point = msg.positions
+	    for i in range(6):
+	        self.pid[i].setPoint(self.set_point[i])
+	else:
+            rospy.logerr("FOLLOW NOT ENABLED!")
+
+
+
+    '''
     follow_goal_cb
     Checks to find position of interactive marker relative to the robot.
     Solves the inverse kinematics via KDL and sets a new PID control point.
     '''
-    def follow_goal_update(self):
+    def follow_goal_cb(self,msg):
         if True: #self.driver_status == 'FOLLOW':
-            ## Set follow goal pose as axis-angle
-            #F_goal = tf_c.fromMsg(msg.pose)
-            #a,axis = F_goal.M.GetRotAngle()
-            #with self.pid_lock:
-            #    self.follow_goal_axis_angle = list(F_goal.p) + [a*axis[0],a*axis[1],a*axis[2]]
-            # Broadcast goal for debugging purposes
-            #self.broadcaster_.sendTransform(tuple(F_goal.p),tuple(F_goal.M.GetQuaternion()),rospy.Time.now(), '/ur_goal','/base_link')
-            ## Set goal pose as PID set point
-            ## with self.pid_lock:
-            ##     for pid, g in zip(self._pid, self.follow_goal_axis_angle):
-            ##         pid.setPoint(g)
-            try:
-                F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/endpoint_interact',rospy.Time(0)))
-                F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/endpoint_interact',rospy.Time(0)))
-                F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
-                F_ee_endpoint = tf_c.fromTf(self.listener_.lookupTransform('/ee_link','/endpoint',rospy.Time(0)))
+           try:
+                #F_target_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/endpoint_interact',rospy.Time(0)))
+                #F_target_base = tf_c.fromTf(self.listener_.lookupTransform('/base_link','/endpoint_interact',rospy.Time(0)))
+                #F_base_world = tf_c.fromTf(self.listener_.lookupTransform('/world','/base_link',rospy.Time(0)))
+                #F_ee_endpoint = tf_c.fromTf(self.listener_.lookupTransform('/ee_link','/endpoint',rospy.Time(0)))
                 
-                self.F_command = F_base_world.Inverse()*F_target_world
+                #self.F_command = F_base_world.Inverse()*F_target_world*F_ee_endpoint.Inverse()
+		self.F_command = tf_c.fromMsg(msg.pose)
+		#print msg
 
                 self.broadcaster_.sendTransform(tuple(self.F_command.p),tuple(self.F_command.M.GetQuaternion()),rospy.Time.now(), '/goal','/base_link')
 
@@ -371,15 +386,14 @@ pidProg()
                 else:
                     rospy.logwarn('no solution found')
 
-                # self.send_command()
 
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-                rospy.logwarn(str(e))
+           except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+               rospy.logwarn(str(e))
 
             #for i in range(6):
             #    self.pid[i].setPoint(self.rob.getj()[i]);
-        #else:
-        #    rospy.logerr("FOLLOW NOT ENABLED!")
+        else:
+            rospy.logerr("FOLLOW NOT ENABLED!")
 
 
     def reached_goal(self,a,b,val):
