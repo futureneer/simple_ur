@@ -471,10 +471,35 @@ pidProg()
         return 'SUCCESS - stopped robot'
 
     def jog(self,msg):
-        rospy.logwarn("GOT JOG MSG")
-        rospy.logwarn(msg)
+        # New Code
+        V = msg.velocity
+        # rospy.logwarn(V)
+        if all(a == 0.0 for a in V):
+            vel_cmd = [0,0,0,0,0,0]
+        else:
+            F_endpoint = self.current_tcp_frame
+            F_VEL = PyKDL.FrameVel(PyKDL.Frame(),PyKDL.Twist(PyKDL.Vector(V[0],V[1],V[2]),PyKDL.Vector(V[3],V[4],V[5])))
+            F_VEL_MOD = F_endpoint*F_VEL
+
+            t = F_VEL_MOD.GetTwist()
+            vel_cmd = [t[0],t[1],t[2],t[3],t[4],t[5]]
+            # F_vels = PyKDL.Frame()
+            # F_vels.p = PyKDL.Vector(vels[3],vels[4],vels[5])
+            # F_vels.M = PyKDL.Rotation.RPY(vels[0],vels[1],vels[2])
+            # F_cmd = F_endpoint*F_vels
+            # Fxyz = F_cmd.p
+            # Frpy = F_cmd.M.GetRPY()
+            # vel_cmd = [Fxyz.x(),Fxyz.y(),Fxyz.z(),Frpy[0],Frpy[1],Frpy[2]]
+            # # vel_cmd = V
+
+        ###########
+        # rospy.logwarn("GOT JOG MSG")
+        rospy.logwarn(vel_cmd)
         if self.driver_status == 'IDLE': 
-            self.rob.speedl(msg.velocity,self.MAX_ACC,10)
+            # self.rob.speedl(msg.velocity,self.MAX_ACC,10)
+
+            self.rob.speedl(vel_cmd,self.MAX_ACC,10)
+            pass
 
     def servo_to_pose_call(self,req): 
         if self.driver_status == 'SERVO':

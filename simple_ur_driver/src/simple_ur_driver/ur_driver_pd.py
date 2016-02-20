@@ -125,6 +125,7 @@ pidProg()
         rospy.logwarn('SIMPLE_UR DRIVER LOADING')
         # Set State First
         self.robot_state = 'POWER OFF'
+        self.driver_status = 'IDLE'
         # TF
         self.broadcaster_ = tf.TransformBroadcaster()
         self.listener_ = tf.TransformListener()
@@ -347,11 +348,11 @@ pidProg()
     '''
     def follow_joint_goal_cb(self,msg):
         if self.driver_status == 'FOLLOW':
-	    print msg
-	    self.set_point = msg.positions
-	    for i in range(6):
+          print msg
+          self.set_point = msg.positions
+          for i in range(6):
 	        self.pid[i].setPoint(self.set_point[i])
-	else:
+        else:
             rospy.logerr("FOLLOW NOT ENABLED!")
 
 
