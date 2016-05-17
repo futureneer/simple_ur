@@ -266,7 +266,7 @@ pidProg()
         self.run_rate = rospy.Rate(30)
 
         ### Set Up Robot ###
-        self.rob = urx.Robot("192.168.1.155", logLevel=logging.INFO)
+        self.rob = urx.Robot("192.168.1.155")
         if not self.rob:
             rospy.logwarn('SIMPLE UR  - ROBOT NOT CONNECTED')
             self.driver_status = 'DISCONNECTED'
@@ -526,50 +526,49 @@ pidProg()
         self.driver_status_publisher.publish(String(self.driver_status))
         self.robot_state_publisher.publish(String(self.robot_state))
 
-
-        # # Check Force
-        # F = self.rob.get_tcp_force()
-        # val_soft = False
-        # val_hard = False
-        # # print F[0]
+        # Check Force
+        F = self.rob.get_tcp_force()
+        val_soft = False
+        val_hard = False
+        # print F[0]
         
-        # for f in F:
-        #   if abs(f) >= 36 and abs(f) < 65:
-        #     rospy.logwarn('Soft Force Exceed: [' +str(f)+']')
-        #     if self.exceed_notify == False:
-        #       self.sound_pub.publish(String("ping_2"))
-        #       self.exceed_notify = True
-        #     val_soft = True
-        #     break
-        #   elif abs(f) >= 65:
-        #     rospy.logwarn('Hard Force Exceed: [' +str(f)+']')
-        #     val_hard = True
-        #     break
-        #   else:
-        #     self.exceed_notify = False
+        for f in F:
+          if f >= 40 and f < 150:
+            rospy.logwarn('Soft Force Exceed: [' +str(f)+']')
+            if self.exceed_notify == False:
+              self.sound_pub.publish(String("ping_2"))
+              self.exceed_notify = True
+            val_soft = True
+            break
+          elif abs(f) >= 150:
+            rospy.logwarn('Hard Force Exceed: [' +str(f)+']')
+            val_hard = True
+            break
+          else:
+            self.exceed_notify = False
 
-        # ps = PredicateList()
-        # ps.pheader.source = rospy.get_name()
-        # ps.statements = []
+        ps = PredicateList()
+        ps.pheader.source = rospy.get_name()
+        ps.statements = []
 
-        # if val_soft:
-        #   statement = PredicateStatement( predicate='soft_force_exceeded',
-        #                                   confidence=1,
-        #                                   value=True,
-        #                                   num_params=1,
-        #                                   params=['robot', '', ''])
-        #   ps.statements += [statement]
-        # if val_hard:
-        #   statement = PredicateStatement( predicate='hard_force_exceeded',
-        #                                   confidence=1,
-        #                                   value=True,
-        #                                   num_params=1,
-        #                                   params=['robot', '', ''])
-        #   ps.statements += [statement]
-        # self.pub_list.publish(ps)
+        if val_soft:
+          statement = PredicateStatement( predicate='soft_force_exceeded',
+                                          confidence=1,
+                                          value=True,
+                                          num_params=1,
+                                          params=['robot', '', ''])
+          ps.statements += [statement]
+        if val_hard:
+          statement = PredicateStatement( predicate='hard_force_exceeded',
+                                          confidence=1,
+                                          value=True,
+                                          num_params=1,
+                                          params=['robot', '', ''])
+          ps.statements += [statement]
+        self.pub_list.publish(ps)
 
     def check_robot_state(self):
-        mode = self.rob.get_all_data()['RobotModeData']
+        mode = self.rob.secmon.get_all_data()['RobotModeData']
 
         if not mode['isPowerOnRobot']:
             self.robot_state = 'POWER OFF'
